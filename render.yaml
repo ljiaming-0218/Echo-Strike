@@ -1,0 +1,11 @@
+services:
+  - type: web
+    name: echo-rush
+    runtime: static
+    repo: https://github.com/ljiaming-0218/Echo-Strike
+    branch: main
+    buildCommand: npm ci --include=dev && npm run typecheck && npm test && npm run build
+    staticPublishPath: ./dist
+    envVars:
+      - key: NODE_VERSION
+        value: 24.19.0
