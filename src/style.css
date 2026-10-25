@@ -46,6 +46,7 @@ button:disabled {
   height: 100vh;
   height: 100dvh;
   overflow: hidden;
+  touch-action: none;
 }
 #game canvas {
   display: block;
