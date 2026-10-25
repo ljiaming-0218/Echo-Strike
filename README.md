@@ -1,5 +1,7 @@
 # 回响特攻 · ECHO RUSH
 
+试玩：**https://echo-rush.onrender.com**
+
 固定竞技场、俯视角、自动射击的单人生存游戏。**当前6秒的行动，会成为未来最多3个循环分身。** 用走位布置历史火线，再把敌人引入过去的弹道。存活180秒获胜，死亡立即结算。
 
 实现：三种敌人、自动枪、冲刺、震荡波、60/120秒两次升级、开始/暂停/结算/重开、音量和减少特效设置、PC键盘、移动端多点触控、失焦与竖屏暂停。无需账号、后端或API密钥。
@@ -86,4 +88,4 @@ CHROMIUM_PATH="$(node -e 'process.stdout.write(require("playwright").chromium.ex
 
 ## 已知限制
 
-已验证Linux Chromium与模拟触摸/横竖屏，**没有真实Android/iOS、Safari或移动GPU性能结果**。程序几何美术遵循首版计划。Phaser独立分包约1.21MB（gzip约332KB），保留Vite体积警告，不隐藏风险。十分钟核心仿真是逻辑有界性验证，不代表真实手机十分钟画面性能。公开部署结果见qa.md。
+已验证Linux Chromium与模拟触摸/横竖屏，**没有真实Android/iOS、Safari或移动GPU性能结果**。程序几何美术遵循首版计划。Phaser独立分包约1.21MB（gzip约332KB），保留Vite体积警告，不隐藏风险。另完成600.8秒桌面Chromium持续运行、3次重开，监听器数量稳定且未见堆占用持续增长；这与十分钟纯核心仿真均不代表真实手机性能。公开部署结果见qa.md。

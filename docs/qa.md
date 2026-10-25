@@ -41,3 +41,23 @@
 未核验：真实Android/iOS、Safari/Edge、多指硬件/系统手势、音频设备策略、真实移动GPU的60秒压力帧率、10分钟浏览器堆采样。自动逻辑与模拟浏览器不能证明这些结果。当前没有公开URL证据，待推送后追加。
 
 发布前最终回归：`npm ci --include=dev`、typecheck、36/36测试、build、4/4浏览器流程全部通过。window/document监听器数在20次重开前后相同。生产preview另测桌面与触屏开始/暂停/继续、6组尺寸切换、全部资源无错误；生产JS无__ECHO_TEST__/testHarness，页面无DEV面板。view_image复查最终桌面/横屏菜单截图，手机高度390的菜单已完整显示主要内容。正式产物主逻辑31.08kB(gzip12.02kB)、CSS11.91kB(gzip3.37kB)、Phaser1208.06kB(gzip332.17kB)。
+
+## GitHub 与 Render 发布核验 · 2026-10-26
+
+- 源码：`b998dae90d744b1c67834093538e20a4fc7b8f46` 完整版本已推送GitHub main；`8f6ecb57282208af6967429da460b1c9f01db4e1` 补齐战场touch-action:none并推送。origin远端SHA已核对。
+- GitHub CI初版完整通过：https://github.com/ljiaming-0218/Echo-Strike/actions/runs/40219988820 。最终补丁运行：https://github.com/ljiaming-0218/Echo-Strike/actions/runs/40220201941 。
+- 用户创建Render站点并提供公开URL：https://echo-rush.onrender.com 。不是代理预览或localhost。
+- 2026-10-26 02:14（Asia/Shanghai）附近，HTTPS首页、index.html、应用JS、Phaser JS和CSS全部HTTP200，MIME正确；三份资源SHA-256与本地8f6ecb5生产产物完全一致（应用JS07111c89c4b3eed3be29a8af37edf3d1807b587cfae06f68a6ae666346351c5b）。TLS校验保持开启。
+- 用户最初截图为纯文本Not Found；检查时根路径/index.html均200，未用SPA重写或改路由掩盖。用户Ctrl+F5后明确确认“已出现开始行动”。可能涉及首轮发布响应/缓存传播，未获得足以唯一确定根因的证据。
+- 云Chromium直接访问公开站点受到环境代理CA信任问题阻挡（ERR_CERT_AUTHORITY_INVALID）。自动审批拒绝持久增加浏览器代理根CA，未修改信任库，未关闭证书校验。采用正常TLS校验的HTTP/资源哈希核验，并结合本地生产Chromium流程与用户公开页面确认；不把这些写成已完成云浏览器线上完整局测试。
+- 实际远端账号控制台Live标签、真实手机完整一局和线上完整180秒交互仍未直接观察。公开静态内容可用不代表这些额外验收已通过。
+
+## 最终桌面浏览器长时检查
+
+以下补充覆盖上文“10分钟浏览器堆采样未测”的阶段状态；真实移动GPU和真机仍未测。
+
+- 方法：本地e2e专用模式、系统无头Chromium、1280×720画布，**实际墙钟600.8秒**，不是快速推进tick。测试夹具只提高玩家生命值，仿真仍按正常60Hz时钟推进，自动选择升级并在胜利后点击重开。正式构建无此夹具。
+- 完成3次重开；20组30秒间隔采样。每次用Chrome DevTools执行GC后读取Runtime.getHeapUsage，首样本7.16MB，末样本8.66MB，预热后8.03～9.48MB波动。未观察到持续累积，不能据此保证不存在所有形式内存问题。
+- 每次采样canvas=1、interface=1，window/document事件监听器计数与初始完全一致。采样最高14敌人、18弹丸、3分身；这是自然波次场景，**不是70敌人渲染压力FPS报告**。70敌人/360弹丸仍由独立核心夹具验证。
+- 未处理pageerror=0，性能暂停=0。音效/画面在桌面无头环境运行，不代表Safari或真实音频硬件测试。
+- 最终源码8f6ecb5的GitHub CI 40220201941已完成且success（类型/36核心测试/构建/4浏览器流程均成功）。
