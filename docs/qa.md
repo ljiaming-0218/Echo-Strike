@@ -95,3 +95,14 @@
 限制：无真实Android/iOS/Safari验证、无移动GPU FPS结论、无真人完整六轮难度反馈。旧版十分钟浏览器运行不代替新版长时/真机。Phaser仍有约1.21MB分包警告。云浏览器公开HTTPS直连的已知代理证书限制不通过修改信任库或关闭TLS绕过，线上将采用正常HTTPS内容/资源哈希检查。
 
 收尾显示检查：复盘另外绘制历史脉冲的真实半径虚线圆，防止只显示射线而遗漏范围伤害；补充浏览器断言确认圆环存在。受影响的复盘/六轮/20次重开流程单独复测通过，build及生产测试接口排除检查通过。
+
+## 时间追猎2.0部署结果
+
+- 源码提交：`e29c836afdc0597b8cac49deb13f5d545a5aec15`，已推送GitHub main。
+- GitHub CI完整成功：https://github.com/ljiaming-0218/Echo-Strike/actions/runs/40278505880 （类型检查、35项核心测试、构建、5个浏览器流程）。
+- Render公开地址：https://echo-rush.onrender.com ，2026-10-26 14:13:47（Asia/Shanghai）检查标题为“时间追猎 · CHRONO HUNT”，HTTPS首页和三份JS/CSS均200、MIME正确、与本地生产文件逐字节一致。
+  - `/assets/index-CxCp14di.js` SHA-256 `7b6d4a3739fc73bd95f238933642094a056a0e4e0eab9f837654d197efb99274`
+  - `/assets/phaser-DFK5Ua9d.js` SHA-256 `f9025c1a29bc3ae097dd886ce07717b297466da1ce8f032c8294252ce6cf5cdb`
+  - `/assets/index-CNR3QZNR.css` SHA-256 `69e8fabba06fb4b04b4462e30d167141aa819e3813028b39e9b5f2f3ed011319`
+- view_image复查最终桌面/手机菜单、敌对过去战场、包含脉冲范围的真实复盘；没有可见裁切或遮挡主操作的问题。旧版友军文案已替换，程序几何美术是有意保留的用户约束。
+- 未把远端HTTP/资源验证当作云浏览器公开站点完整操作；当前线上资源与已经验证过的本地产物一致，真实手机和真人完整六轮平衡仍未验证。
