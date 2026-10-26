@@ -268,7 +268,6 @@ export class World {
   }
   private hurtEcho(e: Echo, damage: number): void {
     if (e.hp <= 0) return;
-    this.visual("hit", e.pose.x, e.pose.y, 18, true);
     e.hp = Math.max(0, e.hp - damage);
     if (e.hp === 0) {
       this.stats.echoKills++;
@@ -371,7 +370,6 @@ export class World {
           if (r.hp > 0)
             candidate(sweep(a, end, r, r, r.radius + b.radius), r.id, () => {
               this.stats.hits++;
-              this.visual("hit", r.x, r.y, 20);
               r.hp = Math.max(0, r.hp - b.damage);
               if (r.hp === 0) {
                 this.stats.relays++;

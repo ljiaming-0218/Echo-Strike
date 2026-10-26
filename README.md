@@ -49,7 +49,7 @@ dev默认5173端口、preview默认4173，以实际输出为准；preview只供�
 - `src/core/World.ts`：纯TS实体、战斗、目标、回合、伤害与计时。
 - `src/core/echo/`：只读快照与敌对事件重演；`clock/`固定步；`math/`碰撞几何。
 - `src/adapters/`：统一键盘、世界坐标鼠标和双摇杆，以及原生全屏请求/微信横向适配和触控坐标转换。
-- `src/view/`：本地实验室/角色素材、立体时间锚、掩体/传送门、残影、命中碎屑、插值与音效；`src/ui/`：菜单、HUD、复盘、设置。
+- `src/view/`：原版程序几何、轨迹、插值与音效；`src/ui/`：菜单、HUD、复盘、设置。
 - `docs/design-v2.md`：当前规则；`docs/plan.md`：历史旧版；`docs/qa.md`：实际证据与限制。
 
 ## Render Static Site
@@ -60,4 +60,4 @@ dev默认5173端口、preview默认4173，以实际输出为准；preview只供�
 - Build Command：`npm ci --include=dev && npm run typecheck && npm test && npm run build`
 - Publish Directory：`dist`；无需Start Command或SPA重写。
 
-仍需真实Android/iOS与Safari验证。Linux模拟触摸不代表真实多指硬件、音频策略或移动GPU帧率；Phaser分包约1.21MB，保留构建体积警告。2.1版实验室地面与角色为生成素材，WebP合计约375KiB，本地托管，不依赖素材CDN。旧版十分钟测试不能代表本次新玩法，当前结果见qa.md。
+仍需真实Android/iOS与Safari验证。Linux模拟触摸不代表真实多指硬件、音频策略或移动GPU帧率；Phaser分包约1.21MB，保留构建体积警告。当前按用户要求恢复2.0的简洁几何画面，移除实验室和装甲角色素材，保留微信/QQ横向适配。旧版十分钟测试不能代表本次新玩法，当前结果见qa.md。
