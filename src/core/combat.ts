@@ -15,18 +15,9 @@ export function createProjectile(
     angle,
     speed: snapshot.speed,
     radius: snapshot.radius,
-    damage:
-      source.kind === "echo"
-        ? Math.max(1, Math.round(snapshot.damage * 0.45))
-        : snapshot.damage,
+    damage: snapshot.damage,
     remainingTicks: snapshot.ttlTicks,
     createdAtTick: tick,
     spent: false,
   };
-}
-export interface DamageCandidate {
-  attackId: number;
-  targetId: number;
-  damage: number;
-  source: Source;
 }

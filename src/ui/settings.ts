@@ -7,7 +7,7 @@ const defaults: Settings = { volume: 0.3, reduced: false, best: 0 };
 export function loadSettings(): Settings {
   try {
     const v: unknown = JSON.parse(
-      localStorage.getItem("echo-rush:v1") ?? "null",
+      localStorage.getItem("chrono-hunt:v2") ?? "null",
     );
     if (!v || typeof v !== "object") return { ...defaults };
     const x = v as Partial<Settings>;
@@ -28,7 +28,7 @@ export function loadSettings(): Settings {
 }
 export function saveSettings(value: Settings): void {
   try {
-    localStorage.setItem("echo-rush:v1", JSON.stringify(value));
+    localStorage.setItem("chrono-hunt:v2", JSON.stringify(value));
   } catch {
     /* Storage is optional, never required to play. */
   }

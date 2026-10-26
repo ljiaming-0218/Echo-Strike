@@ -1,18 +1,12 @@
 import { World } from "../core/World";
+import { CONFIG as C } from "../core/config";
 import { FixedStepClock } from "../core/clock/FixedStepClock";
 import { InputRouter } from "../adapters/InputRouter";
 import { AudioView } from "../view/AudioView";
 import type { WorldView } from "../view/WorldView";
-import type { Upgrade } from "../core/types";
 import { loadSettings, saveSettings } from "./settings";
-
-const icon = (name: string) =>
-  `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true">${name === "pause" ? '<path d="M8 5v14M16 5v14"/>' : name === "dash" ? '<path d="m13 3-8 11h7l-1 7 8-12h-7l1-6Z"/>' : name === "wave" ? '<circle cx="12" cy="12" r="3"/><circle cx="12" cy="12" r="8"/>' : '<path d="M4 7h16M4 12h16M4 17h16"/>'}</svg>`;
-const upgrades = [
-  ["damage", "01", "火力强化", "基础枪伤害 +3", "留下更有力的历史弹道。"],
-  ["speed", "02", "轻量驱动", "移动速度 +10%", "用更灵活的走位，重绘火线。"],
-  ["wave", "03", "震荡扩容", "震荡波半径 +20", "让历史中的爆发覆盖更远。"],
-] as const;
+const arrow =
+  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M4 12h15m-6-6 6 6-6 6"/></svg>';
 export class App {
   world = new World();
   readonly clock = new FixedStepClock();
@@ -21,40 +15,37 @@ export class App {
   readonly input: InputRouter;
   private root = document.createElement("div");
   private overlay!: HTMLElement;
-  private hud!: HTMLElement;
-  private previousScreen = "";
-  private previousTick = -1;
-  private echoListKey = "";
+  private screen = "";
+  private hudTick = -1;
   private discardDelta = true;
   private disposers: (() => void)[] = [];
   private testCleanup: (() => void) | undefined;
   constructor(private readonly view: WorldView) {
     this.input = new InputRouter(
       () => this.world.running,
+      () => this.world.player,
       () => this.togglePause(),
     );
   }
+  private el(id: string): HTMLElement {
+    const node = this.root.querySelector<HTMLElement>(`#${id}`);
+    if (!node) throw Error(`Missing UI ${id}`);
+    return node;
+  }
   mount(): void {
     this.root.id = "interface";
-    this.root.innerHTML = `<header id="hud" class="hud" hidden><div class="hud-brand">ECHO<span>RUSH</span><small>回响特攻</small></div><div class="health"><div><span>生命值</span><b id="hp-value">100 <i>/ 100</i></b></div><div class="track"><div id="hp-fill"></div></div></div><div class="time"><b id="time-value">00:00</b><span> / 03:00</span><small id="wave-stage">第一强度段</small></div><button class="icon-button" id="pause" aria-label="暂停游戏">${icon("pause")}</button></header>
-      <aside id="echo-hud" class="echo-hud" hidden><div class="echo-heading"><span>回响记录</span><b id="echo-count">0 / 3</b></div><div class="track echo-track"><div id="loop-fill"></div></div><p id="loop-label">本段 0.0 / 6.0 秒</p><div id="echo-list"></div></aside>
-      <div id="kills" class="kills" hidden><b id="kills-value">0</b><span>击杀</span></div>
-      <footer id="controls" class="controls" hidden><div class="movement"><div id="joystick" class="joystick" aria-label="移动摇杆"><div id="stick-knob"></div></div><span><kbd>W A S D</kbd> / 方向键移动</span></div><p class="auto-note">自动瞄准 · 把敌人引入过去的火线</p><div class="skill-group"><button id="dash" class="skill" aria-label="冲刺"><span class="skill-icon">${icon("dash")}</span><span><b>冲刺</b><small id="dash-cd">SPACE · 就绪</small></span></button><button id="wave" class="skill" aria-label="震荡波"><span class="skill-icon">${icon("wave")}</span><span><b>震荡波</b><small id="wave-cd">Q · 就绪</small></span></button></div></footer>
-      <section id="overlay" class="overlay" aria-live="polite"></section>`;
+    this.root.innerHTML = `<header id="hud" class="hud" hidden><div class="small-brand">CHRONO<span>HUNT</span><small>时间追猎</small></div><div class="health"><span>当前的你 <b id="hp-value">100</b></span><div class="track"><i id="hp-fill"></i></div></div><div class="round-label">循环 <b id="round-value">01</b><span> / 06</span></div><div class="round-time"><b id="time-value">12.0</b><span>秒后闭合</span></div><button id="pause" class="icon-button" aria-label="暂停游戏"><svg viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M8 5v14M16 5v14"/></svg></button></header>
+  <aside id="mission" class="mission" hidden><span class="mission-title">撤离条件</span><p id="relay-label">时间锚 0 / 3</p><p id="echo-label">敌对过去 0 / 0</p><div id="gate-label">击破所有目标，解锁出口</div></aside>
+  <div id="controls" class="controls" hidden><div id="move-stick" class="stick move-stick" aria-label="移动摇杆"><div class="stick-knob"></div><span>移动</span></div><div class="desktop-help"><kbd>WASD</kbd> 移动 <span>·</span> 鼠标瞄准 / 按住左键开火</div><div class="skills"><button id="dash" aria-label="相位冲刺"><b>相位冲刺</b><small id="dash-cd">SPACE · 就绪</small></button><button id="pulse" aria-label="抹除脉冲"><b>抹除脉冲</b><small id="pulse-cd">Q · 本轮 1 次</small></button></div><div id="aim-stick" class="stick aim-stick" aria-label="瞄准射击摇杆"><div class="stick-knob"></div><span>瞄准 / 开火</span></div></div>
+  <section id="overlay" class="overlay" aria-live="polite"></section>`;
     document.body.append(this.root);
-    if (import.meta.env.DEV) {
-      const debug = document.createElement("div");
-      debug.id = "debug";
-      this.root.append(debug);
-    }
     this.overlay = this.el("overlay");
-    this.hud = this.el("hud");
     this.el("pause").onclick = () => this.togglePause();
     this.input.bindTouch(
-      this.el("joystick"),
-      this.el("stick-knob"),
+      this.el("move-stick"),
+      this.el("aim-stick"),
       this.el("dash"),
-      this.el("wave"),
+      this.el("pulse"),
     );
     const on = (target: EventTarget, type: string, fn: () => void) => {
       target.addEventListener(type, fn);
@@ -72,17 +63,12 @@ export class App {
     this.orientation();
     this.renderUI();
     if (import.meta.env.MODE === "e2e")
-      void import("../debug/testHarness").then(({ attach }) => {
-        this.testCleanup = attach(this);
-      });
-  }
-  private el(id: string): HTMLElement {
-    const e = this.root.querySelector<HTMLElement>(`#${id}`);
-    if (!e) throw Error(`Missing UI ${id}`);
-    return e;
+      void import("../debug/testHarness").then(
+        ({ attach }) => (this.testCleanup = attach(this)),
+      );
   }
   private freeze(
-    reason: "manual" | "hidden" | "portrait" | "performance",
+    reason: "hidden" | "portrait" | "manual" | "performance",
   ): void {
     this.world.pause(reason);
     this.input.clear();
@@ -91,10 +77,8 @@ export class App {
     this.audio.pause();
   }
   private orientation(): void {
-    const portrait =
-      window.innerHeight > window.innerWidth &&
-      matchMedia("(pointer: coarse)").matches;
-    if (portrait) this.freeze("portrait");
+    if (innerHeight > innerWidth && matchMedia("(pointer:coarse)").matches)
+      this.freeze("portrait");
     else this.world.clearReason("portrait");
     this.input.clear();
     this.clock.reset();
@@ -117,25 +101,29 @@ export class App {
   start(): void {
     this.world = new World();
     this.world.start();
+    this.resetPresentation();
+    this.orientation();
+    void this.audio.unlock();
+  }
+  private resetPresentation(): void {
+    this.audio.reset();
+    this.screen = "";
+    this.hudTick = -1;
     this.view.clear();
     this.input.clear();
     this.clock.reset();
     this.discardDelta = true;
-    this.previousScreen = "";
-    this.previousTick = -1;
-    this.echoListKey = "reset";
-    this.orientation();
-    void this.audio.unlock();
     this.renderUI();
+  }
+  private next(): void {
+    this.world.nextRound();
+    this.resetPresentation();
+    this.orientation();
+    if (this.world.running) void this.audio.unlock();
   }
   private menu(): void {
     this.world = new World();
-    this.input.clear();
-    this.clock.reset();
-    this.view.clear();
-    this.audio.pause();
-    this.previousScreen = "";
-    this.renderUI();
+    this.resetPresentation();
   }
   frame(_time: number, delta: number): void {
     this.view.reduced = this.settings.reduced;
@@ -163,8 +151,8 @@ export class App {
     this.view.render(this.world, alpha, delta);
     this.renderUI();
   }
-  private settingMarkup(): string {
-    return `<div class="settings"><label>音量 <input id="volume" aria-label="音量" type="range" min="0" max="1" step="0.05" value="${this.settings.volume}"></label><label class="check"><input id="reduced" type="checkbox" ${this.settings.reduced ? "checked" : ""}>减少特效</label></div>`;
+  private settingsMarkup(): string {
+    return `<div class="settings"><label>音量<input id="volume" type="range" aria-label="音量" min="0" max="1" step=".05" value="${this.settings.volume}"></label><label><input id="reduced" type="checkbox" ${this.settings.reduced ? "checked" : ""}>减少特效</label></div>`;
   }
   private bindSettings(): void {
     const volume = this.overlay.querySelector<HTMLInputElement>("#volume"),
@@ -180,112 +168,104 @@ export class App {
         saveSettings(this.settings);
       };
   }
+  private routePreview(): string {
+    const clip = this.world.echoManager.clips.at(-1);
+    if (!clip) return "";
+    const points = clip.poses
+      .filter((_, i) => i % 5 === 0)
+      .map((p) => `${p.x},${p.y}`)
+      .join(" ");
+    const pulses = clip.events
+      .filter((e) => e.kind === "pulse")
+      .map(
+        (e) =>
+          `<circle data-pulse="true" cx="${e.origin.x}" cy="${e.origin.y}" r="${e.radius}" fill="#ef9787" fill-opacity=".05" stroke="#ef9787" stroke-width="3" stroke-dasharray="10 8"/>`,
+      )
+      .join("");
+    return `<svg class="route-preview" viewBox="0 0 1280 720" role="img" aria-label="刚刚记录的行动轨迹"><rect x="48" y="48" width="1184" height="624" fill="#151620" stroke="#3f384f"/><polyline points="${points}" fill="none" stroke="#d4bdf8" stroke-width="5"/>${clip.events
+      .filter((e) => e.kind === "shot")
+      .map(
+        (e) =>
+          `<line x1="${e.origin.x}" y1="${e.origin.y}" x2="${e.origin.x + Math.cos(e.angleRad) * 85}" y2="${e.origin.y + Math.sin(e.angleRad) * 85}" stroke="#f19d8e" stroke-width="3" opacity=".6"/>`,
+      )
+      .join(
+        "",
+      )}${pulses}<circle cx="${clip.startPose.x}" cy="${clip.startPose.y}" r="12" fill="#ede6d7"/></svg>`;
+  }
   renderUI(): void {
     const w = this.world,
       active = w.state !== "menu";
-    this.hud.hidden = !active;
-    for (const id of ["echo-hud", "kills", "controls"])
+    for (const id of ["hud", "mission", "controls"])
       this.el(id).hidden = !active;
-    if (w.completedTicks !== this.previousTick || w.completedTicks === 0) {
-      this.previousTick = w.completedTicks;
-      if (import.meta.env.DEV) {
-        const debug = this.root.querySelector("#debug");
-        if (debug)
-          debug.textContent = `tick ${w.completedTicks} / local ${w.completedTicks % 360} · ${w.status} [${[...w.pauses].join(",")}] · clips ${w.echoes.map((e) => `${e.clip.clipId}:${e.loopSerial}/${e.eventCursor}`).join(" ")} · enemies ${w.enemies.length} · bullets ${w.projectiles.length} · rejected ${w.stats.rejectedPlayer}/${w.stats.rejectedEcho}/${w.stats.rejectedEnemy}`;
-      }
-      const seconds = w.completedTicks / 60,
-        minutes = Math.floor(seconds / 60),
-        second = Math.floor(seconds % 60);
-      this.el("time-value").textContent =
-        `${String(minutes).padStart(2, "0")}:${String(second).padStart(2, "0")}`;
-      this.el("hp-value").innerHTML = `${w.player.hp} <i>/ 100</i>`;
+    if (w.completedTicks !== this.hudTick || this.hudTick === -1) {
+      this.hudTick = w.completedTicks;
+      this.el("hp-value").textContent = String(w.player.hp);
       this.el("hp-fill").style.width =
         `${Math.max(0, Math.min(100, w.player.hp))}%`;
-      this.el("echo-count").textContent = `${w.echoes.length} / 3`;
-      this.el("loop-fill").style.width = `${(w.completedTicks % 360) / 3.6}%`;
-      this.el("loop-label").textContent =
-        `本段 ${((w.completedTicks % 360) / 60).toFixed(1)} / 6.0 秒`;
-      const echoKey = w.echoes.map((e) => e.id).join(",");
-      if (echoKey !== this.echoListKey) {
-        this.echoListKey = echoKey;
-        this.el("echo-list").innerHTML = [...w.echoes]
-          .reverse()
-          .map(
-            (e, i) =>
-              `<div class="echo-row"><span class="echo-number">${w.echoes.length - i}</span><span>${["最近", "较早", "最早"][i]} <small>第 ${e.clip.clipId + 1} 段</small></span><span class="echo-signal">${"ı".repeat(7 - i * 2)}</span></div>`,
-          )
-          .join("");
-      }
-      this.el("kills-value").textContent = String(w.stats.kills);
-      this.el("wave-stage").textContent =
-        seconds < 60
-          ? "第一强度段"
-          : seconds < 120
-            ? "第二强度段"
-            : "最终强度段";
-      for (const [id, next, key] of [
-        ["dash", w.player.nextDash, "SPACE"],
-        ["wave", w.player.nextWave, "Q"],
-      ] as const) {
-        const left = Math.max(0, next - w.completedTicks) / 60;
-        this.el(`${id}-cd`).textContent =
-          left > 0 ? `${left.toFixed(1)} 秒` : `${key} · 就绪`;
-        this.el(id).classList.toggle("cooling", left > 0);
-      }
+      this.el("round-value").textContent = String(w.round).padStart(2, "0");
+      this.el("time-value").textContent = (
+        (C.roundTicks - w.roundTick) /
+        60
+      ).toFixed(1);
+      this.el("time-value").classList.toggle(
+        "urgent",
+        w.roundTick > C.roundTicks - 180,
+      );
+      this.el("relay-label").textContent =
+        `时间锚 ${w.relays.filter((r) => r.hp <= 0).length} / 3`;
+      this.el("echo-label").textContent =
+        `敌对过去 ${w.echoes.filter((e) => e.hp <= 0).length} / ${w.echoes.length}`;
+      this.el("gate-label").textContent = w.gateOpen
+        ? w.roundTick < C.minRoundTicks
+          ? "出口将于第 3 秒开启"
+          : "出口已解锁 · 进入光环撤离"
+        : "击破所有目标，解锁出口";
+      this.el("gate-label").classList.toggle("open", w.gateOpen);
+      const left = Math.max(0, w.player.nextDash - w.completedTicks) / 60;
+      this.el("dash-cd").textContent = left
+        ? `${left.toFixed(1)} 秒`
+        : "SPACE · 就绪";
+      this.el("pulse-cd").textContent = w.player.pulseAvailable
+        ? "Q · 本轮 1 次"
+        : "本轮已使用";
+      this.el("pulse").classList.toggle("spent", !w.player.pulseAvailable);
     }
     const portrait =
-      innerHeight > innerWidth && matchMedia("(pointer: coarse)").matches;
-    const screen = portrait ? "portrait" : w.status;
-    const screenKey = screen + ":" + [...w.pauses].sort().join(",");
-    if (screenKey === this.previousScreen) return;
-    this.previousScreen = screenKey;
-    this.overlay.hidden = screen === "running";
-    if (screen === "running") return;
-    this.audio.pause();
+      innerHeight > innerWidth && matchMedia("(pointer:coarse)").matches;
+    const state = portrait ? "portrait" : w.status,
+      key = `${state}/${w.round}/${[...w.pauses].sort().join(",")}`;
+    if (key === this.screen) return;
+    this.screen = key;
+    this.overlay.hidden = state === "running";
+    if (state === "running") return;
     this.input.clear();
-    if (screen === "portrait") {
-      this.overlay.innerHTML =
-        '<div class="panel orientation-panel"><div class="rotate-phone"></div><h1>请横屏后继续</h1><p>旋转手机，让过去的自己有更多发挥空间。</p></div>';
-    } else if (screen === "menu") {
-      this.overlay.innerHTML = `<div class="panel menu-panel"><div class="brand-symbol" aria-hidden="true"><span></span><span></span><span></span></div><h1>ECHO<span>RUSH</span></h1><h2>回响特攻</h2><p class="intro">用现在的走位，布置过去的火力。</p><div class="rules"><div><b>6<span>秒</span></b><p>记录你的行动</p></div><span class="rule-link">→</span><div><b>3<span>分身</span></b><p>循环过去的火线</p></div><span class="rule-link">→</span><div><b>180<span>秒</span></b><p>存活即胜利</p></div></div><button id="start" class="primary">开始行动 <span>↗</span></button><p class="controls-note"><kbd>WASD</kbd> 移动　<kbd>SPACE</kbd> 冲刺　<kbd>Q</kbd> 震荡波<br><span>自动开火 · 手机横屏支持摇杆与技能按钮</span></p>${this.settingMarkup()}<p class="menu-foot">单人离线竞技场 <span>本机最高击杀 ${this.settings.best}</span></p></div>`;
+    this.audio.pause();
+    if (state === "menu") {
+      this.overlay.innerHTML = `<div class="menu-layout"><div class="menu-copy"><div class="wordmark">CHRONO<span>HUNT</span></div><h1>你唯一的敌人，<br>是上一轮的你。</h1><p class="intro">瞄准。开火。撤离。<br>你刚刚做过的一切，将在下一轮追猎你。</p><button id="start" class="primary">进入时间循环 ${arrow}</button><div class="menu-meta"><span>6 轮对抗</span><i></i><span>每轮最多 12 秒</span><i></i><span>最多 3 个过去</span></div></div><div class="menu-art" aria-hidden="true"><div class="orbit orbit-outer"></div><div class="orbit orbit-inner"></div><div class="self self-one"><i></i><span>现在</span></div><div class="self self-two"><i></i><span>过去 #1</span></div><div class="self self-three"><i></i><span>过去 #2</span></div><div class="cross-line line-one"></div><div class="cross-line line-two"></div><p>YOUR PAST IS ARMED.</p></div><div class="menu-bottom"><div class="howto"><span><b>01</b> 射击击破 3 个时间锚</span><span><b>02</b> 击败重演旧动作的自己</span><span><b>03</b> 在循环闭合前抵达出口</span></div><div class="input-help"><span><kbd>WASD</kbd> 移动 · 鼠标瞄准 / 左键开火</span><span><kbd>SPACE</kbd> 冲刺 · <kbd>Q</kbd> 清弹 / 伤害附近分身</span><small>手机横屏：左摇杆移动，右摇杆瞄准开火</small></div>${this.settingsMarkup()}</div></div>`;
       this.el("start").onclick = () => this.start();
       this.bindSettings();
-    } else if (screen === "paused") {
-      const reason = w.pauses.has("hidden")
-        ? "窗口已失焦，战场已冻结。"
-        : w.pauses.has("performance")
-          ? "检测到较长帧间隔，已暂停以避免跳步。"
-          : "休息一下。你的回响会等你。";
-      this.overlay.innerHTML = `<div class="panel pause-panel"><p class="section-index">战场暂停</p><h1>时间，停在这里。</h1><p>${reason}</p><button id="resume" class="primary" ${w.pauses.has("hidden") ? "disabled" : ""}>继续行动 <span>→</span></button><button id="menu" class="secondary">返回主菜单</button>${this.settingMarkup()}</div>`;
+    } else if (state === "portrait")
+      this.overlay.innerHTML =
+        '<div class="panel"><div class="rotate-phone"></div><h1>请横屏后继续</h1><p>左手移动，右手瞄准。让过去的自己先走一步。</p></div>';
+    else if (state === "paused") {
+      this.overlay.innerHTML = `<div class="panel compact"><span class="section-label">循环已冻结</span><h1>过去，也在等你。</h1><p>${w.pauses.has("performance") ? "检测到长帧间隔，已暂停以避免跳过行动。" : "恢复后将从同一个瞬间继续。"}</p><button id="resume" class="primary" ${w.pauses.has("hidden") ? "disabled" : ""}>继续追猎 ${arrow}</button><button id="menu" class="secondary">返回主菜单</button>${this.settingsMarkup()}</div>`;
       this.el("resume").onclick = () => this.resume();
       this.el("menu").onclick = () => this.menu();
       this.bindSettings();
-    } else if (screen === "upgrade") {
-      this.overlay.innerHTML = `<div class="panel upgrade-panel"><p class="section-index">${w.completedTicks === 3600 ? "01" : "02"} / 02 · 战术升级</p><h1>给下一个自己，更多可能。</h1><p>选择一项强化。旧分身保留历史参数，新的行动记录将继承升级。</p><div class="upgrade-options">${upgrades.map(([kind, num, title, stat, description]) => `<button data-upgrade="${kind}" class="upgrade-option"><span class="upgrade-no">${num}</span><b>${title}</b><strong>${stat}</strong><p>${description}</p><small>已选 ${w.upgrades[kind]} / 2 <span>选择 →</span></small></button>`).join("")}</div></div>`;
-      this.overlay
-        .querySelectorAll<HTMLButtonElement>("[data-upgrade]")
-        .forEach(
-          (button) =>
-            (button.onclick = () => {
-              w.upgrade(button.dataset.upgrade as Upgrade);
-              this.input.clear();
-              this.clock.reset();
-              this.discardDelta = true;
-              void this.audio.unlock();
-              this.renderUI();
-            }),
-        );
+    } else if (state === "review") {
+      const clip = w.echoManager.clips.at(-1)!;
+      this.overlay.innerHTML = `<div class="review-layout"><div><span class="section-label">第 ${w.round} 轮 · 撤离成功</span><h1>刚才的你，<br>已经站到对面。</h1><p>这段 ${(clip.durationTicks / 60).toFixed(1)} 秒的走位与 ${clip.events.filter((e) => e.kind === "shot").length} 次开火，会在下一轮循环重演。</p><p class="danger-note">记住你开过枪的地方。<br>下一轮，那里可能正是你的必经之路。</p><button id="next" class="primary">进入第 ${w.round + 1} 轮 ${arrow}</button><small class="review-hint">恢复 20 生命 · 技能补充 · 历史最多保留三段</small></div><div class="review-map">${this.routePreview()}<div><span class="legend-now"></span>你的行动轨迹 <span class="legend-past"></span>未来的敌对火线</div></div></div>`;
+      this.el("next").onclick = () => this.next();
     } else {
-      this.settings.best = Math.max(this.settings.best, w.stats.kills);
+      this.settings.best = Math.max(
+        this.settings.best,
+        w.round - (state === "victory" ? 0 : 1),
+      );
       saveSettings(this.settings);
-      this.overlay.innerHTML = `<div class="panel result-panel"><p class="section-index">${screen === "victory" ? "生存完成" : "行动结束"}</p><h1>${screen === "victory" ? "你与回响，一起留下。" : "下一次，改写过去。"}</h1><p>每一段行动，都会成为下一个自己的支援。</p><div class="result-stats"><div><b>${w.stats.kills}</b><span>总击杀</span></div><div><b>${(w.completedTicks / 60).toFixed(1)}<small>s</small></b><span>存活时间</span></div><div><b>${w.stats.playerDamage}</b><span>真人伤害</span></div><div><b>${w.stats.echoDamage}</b><span>分身伤害</span></div></div><p class="result-detail">分身子弹命中率 ${w.stats.echoShots ? `${((w.stats.echoHits / w.stats.echoShots) * 100).toFixed(1)}%` : "—"} <span>含未落地弹丸 · 范围技能除外</span></p><button id="restart" class="primary">再来一局 <span>↗</span></button><button id="menu" class="secondary">返回主菜单</button></div>`;
+      this.overlay.innerHTML = `<div class="panel result"><span class="section-label">${state === "victory" ? "六轮完成 · 因果已切断" : "时间线终止"}</span><h1>${state === "victory" ? "你已超越，过去的自己。" : w.failure === "timeout" ? "循环闭合。你还在里面。" : "过去的你，赢了这一次。"}</h1><p>${state === "victory" ? "所有过去都已被击败。现在，向前走。" : w.failure === "timeout" ? "先击破时间锚与所有过去，再进入出口光环。" : "试着改变路线，利用掩体，让旧火线落空。"}</p><div class="result-stats"><div><b>${state === "victory" ? 6 : w.round - 1}<small>/6</small></b><span>完成循环</span></div><div><b>${w.stats.echoKills}</b><span>击破过去</span></div><div><b>${(w.completedTicks / 60).toFixed(1)}<small>s</small></b><span>行动用时</span></div></div><button id="restart" class="primary">重写这条时间线 ${arrow}</button><button id="menu" class="secondary">返回主菜单</button></div>`;
       this.el("restart").onclick = () => this.start();
       this.el("menu").onclick = () => this.menu();
     }
-    const focus = this.overlay.querySelector<HTMLButtonElement>(
-      "button:not([disabled])",
-    );
-    focus?.focus({ preventScroll: true });
   }
   destroy(): void {
     this.input.destroy();

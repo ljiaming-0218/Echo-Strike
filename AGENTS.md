@@ -1,11 +1,10 @@
-# 回响特攻开发约定
+# 时间追猎开发约定
 
-- 开始时读取 docs/plan.md、docs/progress.md 和 README.md；先核对 Git 状态并保留用户改动。
-- 使用当前隔离环境的现有 checkout，未经用户明确要求不创建 Git worktree。
-- 按里程碑开发，不提前生成后续阶段的空类、玩法或框架。
-- src/core 必须是纯 TypeScript，不得导入 Phaser、DOM、Sprite 或浏览器计时器。
-- 仿真只使用一个固定 60Hz 时钟与 completedTicks；Phaser 只负责输入、画面和声音。
-- 记录成功提交的真人攻击；6秒360步、最多3分身、FIFO、快照与暂停规则见计划。
-- 不添加 React、后端、物理引擎、在线服务或密钥。
-- 修改后运行适用核心测试、typecheck、build，更新 progress；仅记录真实执行结果。
-- 真机、公开网址未经实际核验，必须标为未验证。不自动推送或发布。
+- 开始读取docs/design-v2.md、docs/progress.md、README.md和Git状态。docs/plan.md是旧版历史资料；用户选择的新规则以design-v2为准。
+- 使用现有隔离checkout，不主动创建Git worktree；保留用户已有改动。
+- 核心src/core必须是纯TypeScript，不导入Phaser、DOM、Sprite或浏览器计时器；战斗权威只有一个60Hz时钟。
+- 每轮最多720tick，记录实际成功撤离前的真人姿态和成功攻击；最多3份敌对历史，不能重新瞄准、递归录制或修改快照。
+- 手动瞄准、敌对过去、时间锚、掩体与限时撤离是当前玩法，不恢复旧版自动射击刷怪。
+- 不添加React、后端、数据库、在线模型或密钥。
+- 修改后执行typecheck、相关核心测试、build和浏览器检查，更新progress/qa。不得虚构真机、完整局或公开网址结果。
+- 只有用户授权时提交推送与部署。本会话用户已授权完成开发、GitHub推送及Render自动部署；授权不扩展到无关远端操作。

@@ -4,6 +4,9 @@ export class AudioView {
   private voices = 0;
   private lastTick = -100;
   volume = 0.3;
+  reset(): void {
+    this.lastTick = -100;
+  }
   async unlock(): Promise<void> {
     try {
       this.context ??= new AudioContext();

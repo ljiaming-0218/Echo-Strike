@@ -4,38 +4,37 @@ export function attach(app: App): () => void {
   const api = {
     snapshot: () => ({
       tick: app.world.completedTicks,
+      roundTick: app.world.roundTick,
+      round: app.world.round,
       state: app.world.state,
       status: app.world.status,
       hp: app.world.player.hp,
       player: { x: app.world.player.x, y: app.world.player.y },
-      echoes: app.world.echoes.map((e) => e.clip.clipId),
-      enemies: app.world.enemies.length,
-      bullets: app.world.projectiles.length,
-      stats: { ...app.world.stats },
+      relays: app.world.relays.map((r) => ({ x: r.x, y: r.y, hp: r.hp })),
+      echoes: app.world.echoes.map((e) => ({ round: e.clip.round, hp: e.hp })),
+      projectiles: app.world.projectiles.length,
+      shots: app.world.stats.shots,
       events: app.world.recorder.events.length,
     }),
     advance: (n: number) => {
       for (let i = 0; i < n; i++) app.world.step(idleInput());
       app.renderUI();
     },
-    survive: () => {
-      app.world.player.hp = 1e9;
+    prepareExit: () => {
+      app.world.relays.forEach((r) => (r.hp = 0));
+      app.world.echoes.forEach((e) => (e.hp = 0));
+      app.world.player.x = app.world.exit.x;
+      app.world.player.y = app.world.exit.y;
+      app.world.roundTick = Math.max(180, app.world.roundTick);
     },
     defeat: () => {
-      app.world.player.hp = 1;
-      app.world.player.protectedUntil = 0;
-      app.world.spawnEnemy(
-        "charger",
-        app.world.player.x,
-        app.world.player.y,
-        0,
-      );
+      app.world.player.hp = 0;
       app.world.step(idleInput());
       app.renderUI();
     },
   };
-  Object.assign(window, { __ECHO_TEST__: api });
+  Object.assign(window, { __CHRONO_TEST__: api });
   return () => {
-    Reflect.deleteProperty(window, "__ECHO_TEST__");
+    Reflect.deleteProperty(window, "__CHRONO_TEST__");
   };
 }

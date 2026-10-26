@@ -1,83 +1,300 @@
-import { describe, it, expect } from "vitest";
+import { expect, it, describe } from "vitest";
 import { World } from "../../src/core/World";
-import { idleInput } from "../../src/core/types";
-import { createProjectile } from "../../src/core/combat";
+import { CONFIG as C } from "../../src/core/config";
 import { EchoRecorder } from "../../src/core/echo/EchoRecorder";
+import { createProjectile } from "../../src/core/combat";
 import { FixedStepClock } from "../../src/core/clock/FixedStepClock";
+import { idleInput } from "../../src/core/types";
 import type { InputCommand, RecordedAttack } from "../../src/core/types";
-const world = () => {
-  const w = new World({ spawn: false, autoShoot: false });
+const fresh = () => {
+  const w = new World();
   w.start();
   return w;
 };
-function steps(w: World, n: number, input: InputCommand = idleInput()) {
+const step = (w: World, n: number, input: InputCommand = idleInput()) => {
   for (let i = 0; i < n; i++) w.step(input);
-}
-function clip(events: RecordedAttack[]) {
-  const r = new EchoRecorder({ x: 300, y: 300, aimRad: 0, dashing: false }, 0);
-  r.poses = Array.from({ length: 360 }, () => ({
-    x: 300,
-    y: 300,
-    aimRad: 0,
-    dashing: false,
-  }));
-  r.events = events;
-  return r.seal(99);
-}
-const shot = (tick: number, seq: number): RecordedAttack => ({
+};
+const shot = (
+  tick: number,
+  seq = 0,
+  origin = { x: 400, y: 584 },
+  angle = 0,
+): RecordedAttack => ({
   kind: "shot",
   localTick: tick,
   seq,
-  origin: { x: 300, y: 300 },
-  angleRad: 0,
-  projectile: { damage: 10, speed: 760, radius: 4, ttlTicks: 60 },
+  origin,
+  angleRad: angle,
+  projectile: { damage: 12, speed: 900, radius: 4, ttlTicks: 100 },
 });
+function history(events: RecordedAttack[], length = 360, round = 1) {
+  const r = new EchoRecorder(
+    { x: 400, y: 584, aimRad: 0, dashing: false },
+    round,
+  );
+  for (let i = 0; i < length; i++)
+    r.poses.push({ x: 400, y: 584, aimRad: 0, dashing: false });
+  events.forEach((e) => r.record(e));
+  return r.seal(round);
+}
+function enemy(w: World, events: RecordedAttack[] = [], length = 360) {
+  w.echoManager.add(history(events, length));
+  w.echoManager.reset(() => 900);
+  return w.echoes[0]!;
+}
+function prepareExit(w: World) {
+  w.relays.forEach((r) => (r.hp = 0));
+  w.echoes.forEach((e) => (e.hp = 0));
+  w.player.x = w.exit.x;
+  w.player.y = w.exit.y;
+}
 
-describe("echo lifecycle, combat and world contracts", () => {
-  it("T01 seals 359/360 and atomically retains only C1 C2 C3 at 1440", () => {
-    const w = world();
-    steps(w, 359);
-    expect(w.echoes).toHaveLength(0);
-    steps(w, 1);
-    expect(w.echoes.map((e) => e.clip.clipId)).toEqual([0]);
-    steps(w, 360);
-    expect(w.echoes.map((e) => e.clip.clipId)).toEqual([0, 1]);
-    steps(w, 360);
-    expect(w.echoes.map((e) => e.clip.clipId)).toEqual([0, 1, 2]);
-    steps(w, 360);
-    expect(w.echoes.map((e) => e.clip.clipId)).toEqual([1, 2, 3]);
-    expect(
-      w.echoes.every((e) => e.eventCursor === 0 && e.pose === e.clip.startPose),
-    ).toBe(true);
+describe("manual combat and hostile recorded histories", () => {
+  it("does not auto-fire, follows manual aim, and records only successful attacks", () => {
+    const w = fresh();
+    step(w, 30);
+    expect(w.projectiles).toHaveLength(0);
+    expect(w.recorder.events).toHaveLength(0);
+    w.step({ ...idleInput(), aimRad: 0, firing: true });
+    expect(w.projectiles[0]?.angle).toBe(0);
+    expect(w.recorder.events[0]?.kind).toBe("shot");
+    expect(w.player.nextShot).toBe(w.completedTicks - 1 + C.shotInterval);
   });
-  it("T02/T03 events 0,1,358,359 replay once each per loop with unique attack IDs", () => {
-    const w = world();
-    w.echoManager.add(
-      clip([shot(0, 0), shot(1, 1), shot(358, 2), shot(359, 3)]),
-      100,
+  it("real shots destroy relays once and never consume their own player health", () => {
+    const w = fresh();
+    w.relays = [{ id: 20, x: 780, y: 584, hp: 24, radius: 23 }];
+    step(w, 30, { ...idleInput(), aimRad: 0, firing: true });
+    expect(w.relays[0]?.hp).toBe(0);
+    expect(w.stats.relays).toBe(1);
+    expect(w.player.hp).toBe(100);
+    expect(w.stats.hits).toBe(2);
+  });
+  it("old shot direction hits the current player instead of retargeting", () => {
+    const w = fresh();
+    enemy(w, [shot(0)]);
+    step(w, 20);
+    expect(w.player.hp).toBe(88);
+    expect(w.recorder.events).toHaveLength(0);
+    expect(w.stats.damageTaken).toBe(12);
+  });
+  it("walking out of the historical line makes the same recording miss", () => {
+    const w = fresh();
+    enemy(w, [shot(0)]);
+    w.player.y = 480;
+    step(w, 30);
+    expect(w.player.hp).toBe(100);
+    expect(w.projectiles.every((p) => p.angle === 0)).toBe(true);
+  });
+  it("dead past selves stop firing but their in-flight bullets survive", () => {
+    const w = fresh(),
+      e = enemy(w, [shot(0, 0), shot(10, 1)]);
+    w.step(idleInput());
+    expect(w.projectiles.length).toBe(1);
+    e.hp = 0;
+    step(w, 19);
+    expect(w.player.hp).toBe(88);
+    expect(w.projectiles.filter((b) => b.createdAtTick === 10)).toHaveLength(0);
+  });
+  it("past selves can be shot and award one kill, not ally damage", () => {
+    const w = fresh(),
+      e = enemy(w);
+    w.player.x = 250;
+    step(w, 45, { ...idleInput(), aimRad: 0, firing: true });
+    expect(e.hp).toBe(0);
+    expect(w.stats.echoKills).toBe(1);
+  });
+  it("cover blocks hostile bullets and dash cannot tunnel through cover", () => {
+    const w = fresh();
+    w.player.x = 520;
+    w.player.y = 360;
+    enemy(w, [shot(0, 0, { x: 520, y: 220 }, Math.PI / 2)]);
+    step(w, 30);
+    expect(w.player.hp).toBe(100);
+    const v = fresh();
+    v.player.x = 520;
+    v.player.y = 220;
+    v.step({ ...idleInput(), moveY: 1, dashPressed: true });
+    step(v, 8, { ...idleInput(), moveY: 1 });
+    expect(v.player.y).toBeLessThanOrEqual(244);
+  });
+  it("normalization and world bounds hold even with non-finite input", () => {
+    const w = fresh();
+    w.step({ ...idleInput(), moveX: NaN, moveY: Infinity, aimRad: NaN });
+    expect(Number.isFinite(w.player.x + w.player.y + w.player.aimRad)).toBe(
+      true,
     );
-    const ids = new Set<number>();
-    for (let i = 0; i < 1080; i++) {
-      w.step(idleInput());
-      for (const b of w.projectiles)
-        if (b.source.kind === "echo") ids.add(b.id);
+    step(w, 170, { ...idleInput(), moveX: 1, moveY: 1 });
+    expect(w.player.x).toBeLessThanOrEqual(1218);
+    expect(w.player.y).toBeLessThanOrEqual(658);
+  });
+  it("pulse erases nearby hostile bullets, damages enemies once and is recorded once", () => {
+    const w = fresh(),
+      e = enemy(w);
+    w.player.x = 450;
+    w.projectiles.push(
+      createProjectile(
+        99,
+        { kind: "echo", entityId: 900, clipId: 1, loopSerial: 0, eventSeq: 0 },
+        { x: 470, y: 584 },
+        0,
+        { damage: 12, speed: 0, radius: 4, ttlTicks: 100 },
+        -1,
+      ),
+    );
+    w.step({ ...idleInput(), pulsePressed: true });
+    expect(e.hp).toBe(12);
+    expect(w.projectiles).toHaveLength(0);
+    expect(w.recorder.events.filter((e) => e.kind === "pulse")).toHaveLength(1);
+    step(w, 5, { ...idleInput(), pulsePressed: true });
+    expect(e.hp).toBe(12);
+  });
+  it("past pulse can hurt current self, with the original center and radius", () => {
+    const w = fresh();
+    enemy(w, [
+      {
+        kind: "pulse",
+        seq: 0,
+        localTick: 0,
+        origin: { x: 640, y: 584 },
+        radius: 160,
+        damage: 24,
+      },
+    ]);
+    w.step(idleInput());
+    expect(w.player.hp).toBe(76);
+  });
+  it("dash wins simultaneous input and grants exactly nine ticks of immunity", () => {
+    const w = fresh();
+    enemy(w, [
+      {
+        kind: "pulse",
+        seq: 0,
+        localTick: 0,
+        origin: { x: 640, y: 584 },
+        radius: 160,
+        damage: 24,
+      },
+      {
+        kind: "pulse",
+        seq: 1,
+        localTick: 9,
+        origin: { x: 640, y: 480 },
+        radius: 160,
+        damage: 24,
+      },
+    ]);
+    w.step({
+      ...idleInput(),
+      dashPressed: true,
+      pulsePressed: true,
+      firing: true,
+    });
+    expect(w.player.hp).toBe(100);
+    expect(w.player.pulseAvailable).toBe(true);
+    expect(w.recorder.events).toHaveLength(0);
+    step(w, 9);
+    expect(w.player.hp).toBe(76);
+  });
+  it("full projectile and event budgets reject attacks without cooldown or fake recordings", () => {
+    const w = fresh();
+    for (let i = 0; i < C.projectileCap; i++)
+      w.projectiles.push(
+        createProjectile(
+          100 + i,
+          { kind: "player", entityId: 1 },
+          { x: 100, y: 100 },
+          0,
+          { damage: 12, speed: 0, radius: 4, ttlTicks: 100 },
+          -1,
+        ),
+      );
+    w.step({ ...idleInput(), firing: true });
+    expect(w.stats.rejected).toBe(1);
+    expect(w.player.nextShot).toBe(0);
+    expect(w.recorder.events).toHaveLength(0);
+    const v = fresh();
+    for (let i = 0; i < C.eventCap; i++) v.recorder.events.push(shot(0, i));
+    v.step({ ...idleInput(), firing: true });
+    expect(v.stats.rejected).toBe(1);
+  });
+});
+describe("round goals, recording immutability and lifecycle", () => {
+  it("exit is locked by both anchors and hostile selves", () => {
+    const w = fresh();
+    expect(w.gateOpen).toBe(false);
+    w.relays.forEach((r) => (r.hp = 0));
+    const e = enemy(w);
+    expect(w.gateOpen).toBe(false);
+    e.hp = 0;
+    expect(w.gateOpen).toBe(true);
+  });
+  it("early exit records actual actions and freezes for a tactical review", () => {
+    const w = fresh();
+    prepareExit(w);
+    step(w, C.minRoundTicks + C.exitHoldTicks - 2);
+    expect(w.state).toBe("running");
+    step(w, 1);
+    expect(w.state).toBe("review");
+    const clip = w.echoManager.clips[0]!;
+    expect(clip.durationTicks).toBe(203);
+    expect(clip.poses).toHaveLength(203);
+    expect(Object.isFrozen(clip.poses[0])).toBe(true);
+    const tick = w.completedTicks;
+    step(w, 50);
+    expect(w.completedTicks).toBe(tick);
+  });
+  it("next round restores limited health, resets skills and creates hostile snapshots", () => {
+    const w = fresh();
+    w.player.hp = 70;
+    prepareExit(w);
+    step(w, 203);
+    const history = w.echoManager.clips[0]!,
+      snapshot = JSON.stringify(history);
+    w.nextRound();
+    expect(w.round).toBe(2);
+    expect(w.player.hp).toBe(90);
+    expect(w.echoes).toHaveLength(1);
+    expect(w.echoes[0]?.hp).toBe(36);
+    expect(w.projectiles).toHaveLength(0);
+    expect(w.player.pulseAvailable).toBe(true);
+    expect(JSON.stringify(history)).toBe(snapshot);
+  });
+  it("retains only the last three clips and finishes after six real extraction conditions", () => {
+    const w = fresh();
+    for (let round = 1; round <= 6; round++) {
+      expect(w.round).toBe(round);
+      prepareExit(w);
+      step(w, 203);
+      if (round < 6) {
+        expect(w.state).toBe("review");
+        w.nextRound();
+      } else expect(w.state).toBe("victory");
+      expect(w.echoManager.clips.length).toBeLessThanOrEqual(3);
     }
-    expect(w.stats.echoShots).toBe(12);
-    expect(ids.size).toBe(12);
+    expect(w.echoManager.clips.map((c) => c.round)).toEqual([3, 4, 5]);
   });
-  it("T04 echo shots cannot enter the player recorder", () => {
-    const w = world();
-    w.echoManager.add(clip([shot(0, 0)]), 100);
-    steps(w, 360);
-    expect(w.echoes.at(-1)?.clip.events).toHaveLength(0);
-    expect(w.stats.echoShots).toBe(1);
+  it("unfinished round times out and never creates a short or empty ghost", () => {
+    const w = fresh();
+    step(w, C.roundTicks);
+    expect(w.state).toBe("defeat");
+    expect(w.failure).toBe("timeout");
+    expect(w.echoManager.clips).toHaveLength(0);
   });
-  it("T05/T22 pause reasons and upgrade cannot resume through hidden or portrait", () => {
-    const w = world();
-    w.pause("hidden");
+  it("death on the extraction step takes priority over success", () => {
+    const w = fresh();
+    prepareExit(w);
+    step(w, 202);
+    w.player.hp = 0;
+    w.step(idleInput());
+    expect(w.state).toBe("defeat");
+    expect(w.echoManager.clips).toHaveLength(0);
+  });
+  it("pause reasons do not advance timers and cannot bypass portrait/hidden state", () => {
+    const w = fresh();
     w.pause("portrait");
-    steps(w, 60);
-    expect(w.completedTicks).toBe(0);
+    w.pause("hidden");
+    step(w, 30);
+    expect(w.roundTick).toBe(0);
     w.clearReason("hidden");
     w.resume();
     expect(w.running).toBe(false);
@@ -85,363 +302,46 @@ describe("echo lifecycle, combat and world contracts", () => {
     expect(w.running).toBe(false);
     w.resume();
     expect(w.running).toBe(true);
-    w.state = "upgrade";
-    w.pause("hidden");
-    w.upgrade("damage");
-    expect(w.running).toBe(false);
   });
-  it("T06 30/60/120Hz movement and recordings agree", () => {
-    const results = [30, 60, 120].map((hz) => {
-      const w = world(),
-        c = new FixedStepClock();
-      w.player.x = 300;
-      w.player.y = 300;
-      for (let f = 0; f < hz * 6; f++)
-        c.advanceElapsed(
+  it("events at tick0 and last tick fire once each loop, with unique instance IDs and no recursive recording", () => {
+    const w = fresh();
+    enemy(w, [shot(0, 0), shot(59, 1)], 60);
+    const ids = new Set<number>();
+    for (let n = 0; n < 180; n++) {
+      w.step(idleInput());
+      w.projectiles.forEach((b) => ids.add(b.id));
+    }
+    expect(ids.size).toBe(6);
+    expect(w.recorder.events).toHaveLength(0);
+    expect(w.echoes[0]?.loopSerial).toBe(2);
+  });
+  it.each([30, 60, 120])(
+    "actual player tracks agree at %iHz for a fixed input sequence",
+    (hz) => {
+      const w = fresh(),
+        clock = new FixedStepClock();
+      for (let i = 0; i < hz * 2; i++)
+        clock.advanceElapsed(
           1000 / hz,
           () => {
-            const i = Math.floor(w.completedTicks / 90);
-            w.step({
-              moveX: i === 0 ? 1 : i === 2 ? -1 : 0,
-              moveY: i === 1 ? 1 : i === 3 ? -1 : 0,
-              dashPressed: false,
-              shockwavePressed: false,
-            });
+            w.step({ ...idleInput(), moveX: 1 });
             return w.running;
           },
           () => {},
         );
-      return w.echoes[0]?.clip;
-    });
-    expect(results[0]).toEqual(results[1]);
-    expect(results[1]).toEqual(results[2]);
-    expect(results[0]?.poses.at(-1)?.x).toBeCloseTo(300, 6);
-    expect(results[0]?.poses.at(-1)?.y).toBeCloseTo(300, 6);
-  });
-  it("T07 old direction fires at current target without retargeting", () => {
-    const w = world();
-    w.echoManager.add(clip([shot(0, 0)]), 100);
-    const target = w.spawnEnemy("chaser", 420, 300, 0);
-    w.spawnEnemy("chaser", 300, 500, 0);
-    steps(w, 14);
-    expect(target.hp).toBe(25);
-    expect(w.stats.echoDamage).toBe(5);
-  });
-  it("T08 snapshot deep freeze and exactly one rounding of echo damage", () => {
-    const w = world(),
-      history = clip([shot(0, 0)]),
-      before = JSON.stringify(history);
-    w.echoManager.add(history, 100);
-    w.state = "upgrade";
-    w.upgrade("damage");
-    w.step(idleInput());
-    expect(w.player.damage).toBe(13);
-    expect(w.projectiles[0]?.damage).toBe(5);
-    expect(JSON.stringify(history)).toBe(before);
-    expect(Object.isFrozen(history.events[0])).toBe(true);
-    expect(() => {
-      (history.poses[0] as { x: number }).x = 20;
-    }).toThrow();
-  });
-  it("T10 nonpiercing bullets consume on earliest enemy, deaths and overkill count once", () => {
-    const w = world();
-    const a = w.spawnEnemy("chaser", 400, 300, 0),
-      b = w.spawnEnemy("chaser", 450, 300, 0);
-    a.hp = 3;
-    for (let i = 0; i < 2; i++)
-      w.projectiles.push(
-        createProjectile(
-          100 + i,
-          { kind: "player", entityId: 1 },
-          { x: 300, y: 300 },
-          0,
-          { damage: 10, speed: 12000, radius: 4, ttlTicks: 60 },
-          -1,
-        ),
-      );
-    w.step(idleInput());
-    expect(w.stats.kills).toBe(1);
-    expect(w.stats.playerDamage).toBe(3);
-    expect(b.hp).toBe(30);
-    expect(w.projectiles).toHaveLength(0);
-  });
-  it("T11 wave applies once to each enemy, visual events are not damage", () => {
-    const w = world();
-    w.spawnEnemy("chaser", 650, 350, 0);
-    w.spawnEnemy("chaser", 670, 350, 0);
-    w.step({ ...idleInput(), shockwavePressed: true });
-    expect(w.stats.playerDamage).toBe(36);
-    steps(w, 10);
-    expect(w.stats.playerDamage).toBe(36);
-  });
-  it("T12 deleting an echo never removes its in-flight projectiles", () => {
-    const w = world();
-    w.echoManager.add(clip([shot(359, 0)]), 100);
-    steps(w, 360);
-    const b = w.projectiles.find((p) => p.source.kind === "echo");
-    expect(b).toBeDefined();
-    for (let i = 0; i < 3; i++)
-      w.echoManager.add({ ...clip([]), clipId: 200 + i }, 200 + i);
-    expect(w.echoes.find((e) => e.id === 100)).toBeUndefined();
-    const e = w.spawnEnemy("chaser", 420, 300, 0);
-    steps(w, 10);
-    expect(e.hp).toBe(25);
-  });
-  it("T13 cooldown persists across tick359 and new clip", () => {
-    const w = world();
-    steps(w, 359);
-    w.step({ ...idleInput(), shockwavePressed: true });
-    expect(w.player.nextWave).toBe(659);
-    w.step({ ...idleInput(), shockwavePressed: true });
-    expect(w.recorder.events).toHaveLength(0);
-  });
-  it("T14 dash wins simultaneous input and blocks shooting for exactly nine steps", () => {
-    const w = new World({ spawn: false });
-    w.start();
-    w.spawnEnemy("chaser", 900, 360, 0);
-    w.step({ ...idleInput(), dashPressed: true, shockwavePressed: true });
-    expect(w.recorder.events).toHaveLength(0);
-    steps(w, 8);
-    expect(w.recorder.events).toHaveLength(0);
-    w.step(idleInput());
-    expect(w.recorder.events.filter((e) => e.kind === "shot")).toHaveLength(1);
-    expect(w.player.nextWave).toBe(0);
-  });
-  it("T15 refuses full projectile capacity without recording or cooldown", () => {
-    const w = new World({ spawn: false });
-    w.start();
-    w.spawnEnemy("chaser", 900, 360, 0);
-    for (let i = 0; i < 240; i++)
-      w.projectiles.push(
-        createProjectile(
-          100 + i,
-          { kind: "player", entityId: 1 },
-          { x: 100, y: 100 },
-          0,
-          { damage: 10, speed: 0, radius: 4, ttlTicks: 60 },
-          -1,
-        ),
-      );
-    w.step(idleInput());
-    expect(w.stats.rejectedPlayer).toBe(1);
-    expect(w.player.nextShot).toBe(0);
-    expect(w.recorder.events).toHaveLength(0);
-  });
-  it.each([358, 359])(
-    "T16 death after %i completed ticks takes priority over sealing",
-    (n) => {
-      const w = world();
-      steps(w, n);
-      w.player.hp = 1;
-      w.spawnEnemy("chaser", w.player.x, w.player.y, 0);
-      w.step(idleInput());
-      expect(w.state).toBe("defeat");
-      expect(w.echoes).toHaveLength(0);
-      expect(w.recorder.poses).toHaveLength(0);
+      expect(w.roundTick).toBe(120);
+      expect(w.player.x).toBeCloseTo(1160, 6);
+      expect(w.recorder.poses.length).toBe(120);
     },
   );
-  it("T17 upgrades exactly at60/120 and victory at180 without sealing final segment", () => {
-    const w = world();
-    steps(w, 3600);
-    expect(w.state).toBe("upgrade");
-    expect(w.echoes.at(-1)?.clip.clipId).toBe(9);
-    w.upgrade("damage");
-    steps(w, 3600);
-    expect(w.state).toBe("upgrade");
-    w.upgrade("speed");
-    steps(w, 3600);
-    expect(w.state).toBe("victory");
-    expect(w.echoes.at(-1)?.clip.clipId).toBe(28);
-    expect(w.completedTicks).toBe(10800);
-  });
-  it("T18/T20 new seeded worlds reset IDs, PRNG, stats and results", () => {
-    const run = () => {
-      const w = new World();
-      w.start();
-      steps(w, 600);
-      return {
-        ticks: w.completedTicks,
-        enemies: w.enemies,
-        stats: w.stats,
-        player: w.player,
-      };
-    };
-    expect(run()).toEqual(run());
-    const w = world();
-    expect(w.spawnEnemy("chaser", 40, 40).id).toBe(2);
-    expect(w.echoes).toHaveLength(0);
-  });
-  it("T19 multiple contacts use max damage; immune player consumes hostile bullets", () => {
-    const w = world();
-    w.spawnEnemy("chaser", 640, 360, 0);
-    w.spawnEnemy("charger", 640, 360, 0);
-    w.step(idleInput());
-    expect(w.player.hp).toBe(82);
-    w.projectiles.push(
-      createProjectile(
-        100,
-        { kind: "enemy", entityId: 5 },
-        w.player,
-        0,
-        { damage: 8, speed: 0, radius: 5, ttlTicks: 180 },
-        w.completedTicks,
-      ),
-    );
-    w.step(idleInput());
-    expect(w.player.hp).toBe(82);
-    expect(w.projectiles).toHaveLength(0);
-  });
-  it("T21 new bullet gets full TTL and cannot hit a target before emission", () => {
-    const w = world();
-    const b = createProjectile(
-      100,
-      { kind: "player", entityId: 1 },
-      { x: 600, y: 200 },
-      0,
-      { damage: 10, speed: 760, radius: 4, ttlTicks: 60 },
-      0,
-    );
-    w.projectiles.push(b);
-    w.step(idleInput());
-    expect(b.x).toBe(600);
-    expect(b.remainingTicks).toBe(60);
-    w.step(idleInput());
-    expect(b.x).toBeCloseTo(600 + 760 / 60);
-    expect(b.remainingTicks).toBe(59);
-  });
-  it("10-minute bounded simulation and twenty complete world resets", () => {
-    const w = new World({ durationTicks: 36000 });
-    w.player.hp = 1e9;
-    w.start();
-    for (let i = 0; i < 36000; i++) {
-      if (w.state === "upgrade") w.upgrade("damage");
-      w.step({
-        moveX: Math.cos(i / 90),
-        moveY: Math.sin(i / 90),
-        dashPressed: i % 180 === 0,
-        shockwavePressed: i % 300 === 0,
-      });
-      if (i % 360 === 0) {
-        expect(w.echoes.length).toBeLessThanOrEqual(3);
-        expect(w.enemies.length).toBeLessThanOrEqual(70);
-        expect(
-          w.projectiles.filter((b) => b.source.kind !== "enemy").length,
-        ).toBeLessThanOrEqual(240);
-        expect(
-          w.projectiles.filter((b) => b.source.kind === "enemy").length,
-        ).toBeLessThanOrEqual(120);
-        expect(w.visuals.length).toBeLessThanOrEqual(150);
-        expect(w.recorder.poses.length).toBeLessThan(360);
-      }
+  it("twenty new worlds reset IDs, tapes and state without retained battle objects", () => {
+    for (let n = 0; n < 20; n++) {
+      const w = fresh();
+      expect(w.relays[0]?.id).toBe(2);
+      expect(w.round).toBe(1);
+      expect(w.completedTicks).toBe(0);
+      expect(w.projectiles).toHaveLength(0);
+      expect(w.echoManager.clips).toHaveLength(0);
     }
-    expect(w.state).toBe("victory");
-    expect([
-      w.stats.rejectedPlayer,
-      w.stats.rejectedEcho,
-      w.stats.rejectedEnemy,
-    ]).toEqual([0, 0, 0]);
-    for (let i = 0; i < 20; i++) {
-      const fresh = new World();
-      expect(fresh.completedTicks).toBe(0);
-      expect(fresh.projectiles.length + fresh.echoes.length).toBe(0);
-    }
-  });
-});
-
-describe("capacity, boundary and enemy-state regression", () => {
-  it("T15 event-limit rejection does not consume skill cooldown", () => {
-    const w = world();
-    w.recorder.events = Array.from({ length: 256 }, (_, i) => shot(0, i));
-    w.step({ ...idleInput(), shockwavePressed: true });
-    expect(w.player.nextWave).toBe(0);
-    expect(w.stats.rejectedPlayer).toBe(1);
-    expect(w.recorder.events.length).toBe(256);
-  });
-  it("T17 same-tick death at 180 seconds wins over victory", () => {
-    const w = world();
-    steps(w, 3600);
-    w.upgrade("damage");
-    steps(w, 3600);
-    w.upgrade("damage");
-    steps(w, 3599);
-    const clip = w.echoes.at(-1)?.clip.clipId;
-    w.player.hp = 1;
-    w.spawnEnemy("chaser", w.player.x, w.player.y, 0);
-    w.step(idleInput());
-    expect(w.completedTicks).toBe(10800);
-    expect(w.state).toBe("defeat");
-    expect(w.echoes.at(-1)?.clip.clipId).toBe(clip);
-  });
-  it("dash immunity still consumes a hostile projectile", () => {
-    const w = world();
-    w.projectiles.push(
-      createProjectile(
-        100,
-        { kind: "enemy", entityId: 8 },
-        { x: 640, y: 350 },
-        0,
-        { damage: 8, speed: 0, radius: 5, ttlTicks: 180 },
-        0,
-      ),
-    );
-    w.step({ ...idleInput(), dashPressed: true });
-    expect(w.player.hp).toBe(100);
-    expect(w.projectiles).toHaveLength(0);
-  });
-  it("spawn at cap skips schedule, no accumulated spawn debt on clearing", () => {
-    const w = new World({ autoShoot: false });
-    w.player.hp = 1e9;
-    w.start();
-    for (let i = 0; i < 70; i++) w.spawnEnemy("chaser", 50, 50, 100000);
-    steps(w, 300);
-    expect(w.enemies).toHaveLength(70);
-    w.enemies = [];
-    w.step(idleInput());
-    expect(w.enemies).toHaveLength(1);
-    steps(w, 59);
-    expect(w.enemies).toHaveLength(1);
-  });
-  it("enemy warning prevents hits, shooter locks direction and aims every90 ticks", () => {
-    const w = world();
-    const enemy = w.spawnEnemy("shooter", 800, 360, 0);
-    steps(w, 91);
-    expect(enemy.phase).toBe("windup");
-    const angle = enemy.angle;
-    w.player.y = 500;
-    steps(w, 24);
-    expect(w.projectiles[0]?.angle).toBe(angle);
-    steps(w, 66);
-    expect(enemy.phase).toBe("windup");
-    const dormant = w.spawnEnemy("chaser", w.player.x, w.player.y, 36);
-    w.step({ ...idleInput(), shockwavePressed: true });
-    expect(dormant.hp).toBe(30);
-  });
-  it("70 enemies and forced 360-projectile fixture remains bounded", () => {
-    const w = world();
-    w.player.hp = 1e9;
-    for (let i = 0; i < 70; i++)
-      w.spawnEnemy(
-        i % 3 === 0 ? "shooter" : i % 3 === 1 ? "charger" : "chaser",
-        80 + (i % 10) * 110,
-        80 + Math.floor(i / 10) * 80,
-        0,
-      );
-    for (let i = 0; i < 360; i++)
-      w.projectiles.push(
-        createProjectile(
-          1000 + i,
-          i < 240
-            ? { kind: "player", entityId: 1 }
-            : { kind: "enemy", entityId: 8 },
-          { x: 100 + (i % 80) * 14, y: 100 + Math.floor(i / 80) * 90 },
-          i,
-          { damage: 10, speed: 760, radius: 4, ttlTicks: 60 },
-          -1,
-        ),
-      );
-    steps(w, 180);
-    expect(w.projectiles.length).toBeLessThanOrEqual(360);
-    expect(w.enemies.length).toBeLessThanOrEqual(70);
-    expect(Number.isFinite(w.player.x)).toBe(true);
   });
 });

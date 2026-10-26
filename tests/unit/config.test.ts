@@ -1,24 +1,19 @@
-import { describe, expect, it } from "vitest";
-import { CONFIG } from "../../src/core/config";
-
-describe("首版仿真配置合同", () => {
-  it("6秒记录恰好360步，180秒结算对齐完整片段", () => {
-    expect(CONFIG.tickRate).toBe(60);
-    expect(CONFIG.clipTicks).toBe(6 * CONFIG.tickRate);
-    expect(CONFIG.matchTicks).toBe(180 * CONFIG.tickRate);
-    expect(CONFIG.matchTicks % CONFIG.clipTicks).toBe(0);
-    expect(
-      [60, 120].every(
-        (seconds) => (seconds * CONFIG.tickRate) % CONFIG.clipTicks === 0,
-      ),
-    ).toBe(true);
-  });
-
-  it("历史窗口有界，场地足以容纳玩家和震荡波", () => {
-    expect(CONFIG.maxEchoes).toBe(3);
-    expect((CONFIG.maxEchoes + 1) * CONFIG.clipTicks).toBe(1440);
-    expect(CONFIG.width / CONFIG.height).toBeCloseTo(16 / 9);
-    expect(CONFIG.height - CONFIG.arenaInset * 2).toBeGreaterThan(2 * 110);
-    expect(Object.isFrozen(CONFIG)).toBe(true);
-  });
+import { expect, it } from "vitest";
+import { CONFIG as C, COVER } from "../../src/core/config";
+it("short tactical rounds have finite history, event and projectile budgets", () => {
+  expect(C.tickRate).toBe(60);
+  expect(C.roundTicks / C.tickRate).toBe(12);
+  expect(C.totalRounds).toBe(6);
+  expect(C.maxEchoes).toBe(3);
+  expect((C.maxEchoes + 1) * C.roundTicks).toBe(2880);
+  expect(C.eventCap).toBeGreaterThan(C.roundTicks / C.shotInterval + 1);
+  expect(C.minRoundTicks + C.exitHoldTicks).toBeLessThan(C.roundTicks);
+});
+it("arena and cover leave a continuous central extraction corridor", () => {
+  expect(C.width / C.height).toBeCloseTo(16 / 9);
+  expect(
+    COVER.every(
+      (r) => r.x + r.width < 640 - C.playerRadius || r.x > 640 + C.playerRadius,
+    ),
+  ).toBe(true);
 });

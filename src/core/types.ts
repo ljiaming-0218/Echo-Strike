@@ -9,14 +9,18 @@ export interface Pose extends Vec2 {
 export interface InputCommand {
   moveX: number;
   moveY: number;
+  aimRad: number;
+  firing: boolean;
   dashPressed: boolean;
-  shockwavePressed: boolean;
+  pulsePressed: boolean;
 }
 export const idleInput = (): InputCommand => ({
   moveX: 0,
   moveY: 0,
+  aimRad: -Math.PI / 2,
+  firing: false,
   dashPressed: false,
-  shockwavePressed: false,
+  pulsePressed: false,
 });
 export interface ProjectileSnapshot {
   readonly damage: number;
@@ -34,7 +38,7 @@ export type RecordedAttack =
       projectile: Readonly<ProjectileSnapshot>;
     }>
   | Readonly<{
-      kind: "shockwave";
+      kind: "pulse";
       seq: number;
       localTick: number;
       origin: Vec2;
@@ -42,24 +46,25 @@ export type RecordedAttack =
       damage: number;
     }>;
 export interface EchoClip {
-  readonly schemaVersion: 1;
   readonly clipId: number;
-  readonly startCompletedTick: number;
-  readonly durationTicks: 360;
+  readonly round: number;
   readonly startPose: Pose;
+  readonly durationTicks: number;
   readonly poses: readonly Pose[];
   readonly events: readonly RecordedAttack[];
 }
 export interface Echo {
   id: number;
   clip: EchoClip;
-  loopSerial: number;
-  eventCursor: number;
+  hp: number;
   pose: Pose;
   previousPose: Pose;
+  eventCursor: number;
+  loopSerial: number;
+  lastLocalTick: number;
 }
 export type Source =
-  | Readonly<{ kind: "player" | "enemy"; entityId: number }>
+  | Readonly<{ kind: "player"; entityId: number }>
   | Readonly<{
       kind: "echo";
       entityId: number;
@@ -67,22 +72,6 @@ export type Source =
       loopSerial: number;
       eventSeq: number;
     }>;
-export interface Enemy {
-  id: number;
-  kind: "chaser" | "charger" | "shooter";
-  x: number;
-  y: number;
-  px: number;
-  py: number;
-  radius: number;
-  hp: number;
-  maxHp: number;
-  activeAt: number;
-  phase: "chase" | "windup" | "charge" | "recover";
-  until: number;
-  angle: number;
-  nextAttack: number;
-}
 export interface Projectile {
   id: number;
   source: Source;
@@ -96,6 +85,15 @@ export interface Projectile {
   createdAtTick: number;
   spent: boolean;
 }
+export interface Relay {
+  id: number;
+  x: number;
+  y: number;
+  hp: number;
+  radius: number;
+}
+export type State = "menu" | "running" | "review" | "victory" | "defeat";
+export type PauseReason = "manual" | "hidden" | "portrait" | "performance";
 export type VisualEvent = {
   kind: "shot" | "wave" | "hurt" | "kill" | "cycle" | "dash";
   x: number;
@@ -103,6 +101,3 @@ export type VisualEvent = {
   radius: number;
   echo: boolean;
 };
-export type State = "menu" | "running" | "upgrade" | "victory" | "defeat";
-export type PauseReason = "manual" | "hidden" | "portrait" | "performance";
-export type Upgrade = "damage" | "speed" | "wave";

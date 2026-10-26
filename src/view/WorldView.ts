@@ -1,23 +1,23 @@
 import Phaser from "phaser";
+import { CONFIG as C, COVER } from "../core/config";
 import type { World } from "../core/World";
-import { lerpAngle } from "../core/math/geometry";
 import type { VisualEvent } from "../core/types";
 interface Effect extends VisualEvent {
   age: number;
 }
 export class WorldView {
-  private readonly art: Phaser.GameObjects.Graphics;
+  private art: Phaser.GameObjects.Graphics;
+  private labels: Phaser.GameObjects.Text[];
   private effects: Effect[] = [];
-  private tags: Phaser.GameObjects.Text[];
   reduced = false;
   constructor(scene: Phaser.Scene) {
     this.art = scene.add.graphics();
-    this.tags = [0, 1, 2].map(() =>
+    this.labels = [0, 1, 2].map(() =>
       scene.add
         .text(0, 0, "", {
           fontFamily: "monospace",
-          fontSize: "12px",
-          color: "#76ebd6",
+          fontSize: "11px",
+          color: "#ff9b86",
         })
         .setOrigin(0.5),
     );
@@ -26,183 +26,199 @@ export class WorldView {
     this.effects = [];
   }
   consume(events: readonly VisualEvent[]): void {
-    for (const e of events)
-      if (e.kind !== "shot" && this.effects.length < 150)
-        this.effects.push({ ...e, age: 0 });
+    for (const event of events)
+      if (event.kind !== "shot" && this.effects.length < C.effectCap)
+        this.effects.push({ ...event, age: 0 });
   }
   render(w: World, alpha: number, delta: number): void {
     const g = this.art;
     g.clear();
-    g.fillStyle(0x101c24).fillRect(32, 32, 1216, 656);
-    g.lineStyle(1, 0x1b2d36, 0.65);
-    for (let x = 32; x <= 1248; x += 48) g.lineBetween(x, 32, x, 688);
-    for (let y = 32; y <= 688; y += 48) g.lineBetween(32, y, 1248, y);
-    g.lineStyle(1.5, 0x38585f).strokeRect(32, 32, 1216, 656);
-    g.lineStyle(3, 0x67dac6);
-    for (const x of [32, 1248])
-      for (const y of [32, 688]) {
-        g.lineBetween(x, y, x + (x === 32 ? 24 : -24), y);
-        g.lineBetween(x, y, x, y + (y === 32 ? 24 : -24));
+    g.fillStyle(0x12141e).fillRect(48, 48, 1184, 624);
+    g.lineStyle(1, 0x252735, 0.5);
+    for (let x = 64; x < 1232; x += 40) g.lineBetween(x, 48, x, 672);
+    for (let y = 64; y < 672; y += 40) g.lineBetween(48, y, 1232, y);
+    g.lineStyle(1, 0x3d3b50).strokeRect(48, 48, 1184, 624);
+    g.lineStyle(1, 0x393546, 0.7)
+      .strokeCircle(640, 360, 218)
+      .strokeCircle(640, 360, 208);
+    for (let a = 0; a < Math.PI * 2; a += Math.PI / 24) {
+      const major = Math.round(a / (Math.PI / 24)) % 4 === 0;
+      g.lineStyle(major ? 2 : 1, 0x7d668f, 0.45);
+      g.lineBetween(
+        640 + Math.cos(a) * 208,
+        360 + Math.sin(a) * 208,
+        640 + Math.cos(a) * (major ? 194 : 202),
+        360 + Math.sin(a) * (major ? 194 : 202),
+      );
+    }
+    const phase = w.roundTick / C.roundTicks;
+    g.lineStyle(3, 0xb6a2f1, 0.6).beginPath();
+    g.arc(640, 360, 218, -Math.PI / 2, -Math.PI / 2 + phase * Math.PI * 2);
+    g.strokePath();
+    for (const r of COVER) {
+      g.fillStyle(0x262533).fillRoundedRect(r.x, r.y, r.width, r.height, 3);
+      g.lineStyle(1, 0x696079).strokeRoundedRect(
+        r.x,
+        r.y,
+        r.width,
+        r.height,
+        3,
+      );
+      g.lineStyle(2, 0xb6a2f1, 0.5).lineBetween(
+        r.x + 12,
+        r.y + 5,
+        r.x + r.width - 12,
+        r.y + 5,
+      );
+    }
+    if (w.state === "menu") {
+      this.labels.forEach((label) => label.setVisible(false));
+      return;
+    }
+    const open = w.gateOpen,
+      x = w.exit.x,
+      y = w.exit.y;
+    g.lineStyle(1, open ? 0xd6e8ab : 0x545064).strokeCircle(x, y, 40);
+    g.lineStyle(2, open ? 0xd6e8ab : 0x545064).strokeRect(
+      x - 22,
+      y - 22,
+      44,
+      44,
+    );
+    g.fillStyle(open ? 0xc9e49a : 0x545064, open ? 0.12 : 0.05).fillCircle(
+      x,
+      y,
+      39,
+    );
+    g.lineStyle(3, 0xe5efce).beginPath();
+    g.arc(
+      x,
+      y,
+      46,
+      -Math.PI / 2,
+      -Math.PI / 2 + (w.exitHold / C.exitHoldTicks) * Math.PI * 2,
+    );
+    g.strokePath();
+    for (const r of w.relays) {
+      if (r.hp <= 0) {
+        g.lineStyle(1, 0x77716e, 0.4).strokeRect(r.x - 9, r.y - 9, 18, 18);
+        continue;
       }
-    const t = w.completedTicks;
-    // Pose-only historical paths never participate in collision.
+      g.fillStyle(0xe6be78, 0.1).fillCircle(r.x, r.y, 31);
+      g.lineStyle(2, 0xe6be78).strokePoints(
+        [
+          { x: r.x, y: r.y - 23 },
+          { x: r.x + 23, y: r.y },
+          { x: r.x, y: r.y + 23 },
+          { x: r.x - 23, y: r.y },
+        ],
+        true,
+      );
+      g.fillStyle(0xf2ce87).fillCircle(r.x, r.y, 5);
+      g.lineStyle(2, 0xe6be78, 0.8).lineBetween(
+        r.x - 15,
+        r.y + 34,
+        r.x - 15 + (30 * r.hp) / C.relayHP,
+        r.y + 34,
+      );
+    }
     for (const [i, e] of w.echoes.entries()) {
-      const x = e.previousPose.x + (e.pose.x - e.previousPose.x) * alpha,
-        y = e.previousPose.y + (e.pose.y - e.previousPose.y) * alpha;
+      if (e.hp <= 0) {
+        this.labels[i]?.setVisible(false);
+        continue;
+      }
+      const ex = e.previousPose.x + (e.pose.x - e.previousPose.x) * alpha,
+        ey = e.previousPose.y + (e.pose.y - e.previousPose.y) * alpha;
       if (!this.reduced) {
-        g.lineStyle(1, 0x69dfcc, 0.14);
+        g.lineStyle(1, 0xf88a7e, 0.25);
         g.beginPath();
-        const end = t % 360;
-        for (let j = Math.max(0, end - 70); j < end; j += 3) {
-          const p = e.clip.poses[j];
+        const local = e.lastLocalTick;
+        let first = true;
+        for (let n = Math.max(0, local - 55); n < local; n += 3) {
+          const p = e.clip.poses[n];
           if (!p) continue;
-          if (j === Math.max(0, end - 70)) g.moveTo(p.x, p.y);
-          else g.lineTo(p.x, p.y);
+          if (first) {
+            g.moveTo(p.x, p.y);
+            first = false;
+          } else g.lineTo(p.x, p.y);
         }
         g.strokePath();
       }
-      g.fillStyle(0x62ddc7, 0.12).fillCircle(x, y, 14);
-      g.lineStyle(2, 0x73efda, 0.6).strokeCircle(x, y, 14);
-      g.lineBetween(
-        x,
-        y,
-        x + Math.cos(e.pose.aimRad) * 23,
-        y + Math.sin(e.pose.aimRad) * 23,
+      g.fillStyle(0xff8278, 0.18).fillCircle(ex, ey, 14);
+      g.lineStyle(2, 0xff8e82).strokeCircle(ex, ey, 14);
+      g.lineStyle(3, 0xffae9a).lineBetween(
+        ex + Math.cos(e.pose.aimRad) * 9,
+        ey + Math.sin(e.pose.aimRad) * 9,
+        ex + Math.cos(e.pose.aimRad) * 26,
+        ey + Math.sin(e.pose.aimRad) * 26,
       );
-      this.tags[i]
-        ?.setText(String(i + 1))
-        .setPosition(x, y - 24)
+      g.lineStyle(2, 0xff8e82).lineBetween(
+        ex - 15,
+        ey + 23,
+        ex - 15 + (30 * e.hp) / C.echoHP,
+        ey + 23,
+      );
+      this.labels[i]
+        ?.setText(`过去 #${e.clip.round}`)
+        .setPosition(ex, ey - 25)
         .setVisible(true);
     }
-    for (let i = w.echoes.length; i < 3; i++) this.tags[i]?.setVisible(false);
-    for (const e of w.enemies) {
-      if (t < e.activeAt) {
-        const f = 1 - (e.activeAt - t) / 36;
-        g.lineStyle(2, 0xff9c65, 0.3 + f * 0.6);
-        if (e.kind === "charger") g.strokeRect(e.x - 19, e.y - 19, 38, 38);
-        else if (e.kind === "shooter")
-          g.strokeTriangle(
-            e.x,
-            e.y - 22,
-            e.x - 20,
-            e.y + 14,
-            e.x + 20,
-            e.y + 14,
-          );
-        else g.strokeCircle(e.x, e.y, 18 + 8 * (1 - f));
-        continue;
-      }
-      if (e.phase === "windup") {
-        g.lineStyle(e.kind === "charger" ? 5 : 2, 0xffa473, 0.5);
-        g.lineBetween(
-          e.x,
-          e.y,
-          e.x + Math.cos(e.angle) * (e.kind === "charger" ? 180 : 240),
-          e.y + Math.sin(e.angle) * (e.kind === "charger" ? 180 : 240),
-        );
-      }
-      const x = e.px + (e.x - e.px) * alpha,
-        y = e.py + (e.y - e.py) * alpha;
-      g.fillStyle(
-        e.kind === "chaser"
-          ? 0xe16b54
-          : e.kind === "charger"
-            ? 0xffa063
-            : 0xe6bc72,
-      );
-      if (e.kind === "chaser") g.fillCircle(x, y, 16);
-      else if (e.kind === "charger") {
-        g.fillPoints(
-          [
-            { x, y: y - 21 },
-            { x: x + 21, y },
-            { x, y: y + 21 },
-            { x: x - 21, y },
-          ],
-          true,
-        );
-      } else g.fillTriangle(x, y - 19, x - 18, y + 15, x + 18, y + 15);
-      g.fillStyle(0x171c24).fillCircle(x, y, 5);
-      if (e.hp < e.maxHp) {
-        g.fillStyle(0x462f30).fillRect(x - 18, y - 30, 36, 3);
-        g.fillStyle(0xf8b995).fillRect(
-          x - 18,
-          y - 30,
-          (36 * e.hp) / e.maxHp,
-          3,
-        );
-      }
-    }
+    for (let i = w.echoes.length; i < 3; i++) this.labels[i]?.setVisible(false);
     for (const b of w.projectiles) {
-      const color =
-        b.source.kind === "enemy"
-          ? 0xff8c64
-          : b.source.kind === "echo"
-            ? 0x68ead3
-            : 0xf1f6eb;
-      g.lineStyle(b.radius * 1.3, color).lineBetween(
-        b.x - Math.cos(b.angle) * 9,
-        b.y - Math.sin(b.angle) * 9,
+      const color = b.source.kind === "echo" ? 0xff776d : 0xf2ebd8;
+      g.lineStyle(3, color).lineBetween(
+        b.x - Math.cos(b.angle) * 12,
+        b.y - Math.sin(b.angle) * 12,
         b.x,
         b.y,
       );
-      g.fillStyle(color).fillCircle(b.x, b.y, b.radius * 0.8);
+      g.fillStyle(color).fillCircle(b.x, b.y, 3);
     }
-    if (w.state !== "menu") {
-      const p = w.player,
-        x = p.px + (p.x - p.px) * alpha,
-        y = p.py + (p.y - p.py) * alpha,
-        angle = lerpAngle(
-          w.recorder.poses.at(-2)?.aimRad ?? p.aimRad,
-          p.aimRad,
-          alpha,
-        );
-      const dashing = t < p.dashUntil,
-        protectedNow = t < p.protectedUntil;
-      g.fillStyle(0xffffff, protectedNow && t % 10 < 5 ? 0.4 : 1).fillCircle(
-        x,
-        y,
-        14,
-      );
-      g.lineStyle(3, 0x91f9e1).lineBetween(
-        x,
-        y,
-        x + 23 * Math.cos(angle),
-        y + 23 * Math.sin(angle),
-      );
-      if (dashing) {
-        g.lineStyle(2, 0xadf5e5, 0.7).strokeCircle(x, y, 22);
-      }
-      const phase = (t % 360) / 360;
-      if (phase > 5.5 / 6 && !this.reduced) {
-        g.lineStyle(2, 0x78ecd2, 0.5).beginPath();
-        g.arc(x, y, 31, -Math.PI / 2, -Math.PI / 2 + phase * Math.PI * 2);
-        g.strokePath();
-      }
-    }
-    const visualDelta = w.running ? Math.min(delta, 100) : 0;
-    for (const e of this.effects) {
-      e.age += visualDelta;
-      const f = e.age / (e.kind === "wave" ? 420 : 300);
-      if (f >= 1) continue;
-      const color =
-        e.kind === "kill" ? 0xff9b75 : e.kind === "hurt" ? 0xff7973 : 0x7be5d0;
-      if (e.kind === "wave") {
-        g.lineStyle(this.reduced ? 1 : 3, color, (1 - f) * 0.65).strokeCircle(
-          e.x,
-          e.y,
-          e.radius * (0.25 + f * 0.75),
-        );
-      } else if (!this.reduced) {
-        g.lineStyle(2, color, (1 - f) * 0.65).strokeCircle(
-          e.x,
-          e.y,
-          e.radius * (0.5 + f),
-        );
-      }
-    }
-    this.effects = this.effects.filter(
-      (e) => e.age < (e.kind === "wave" ? 420 : 300),
+    const p = w.player,
+      px = p.px + (p.x - p.px) * alpha,
+      py = p.py + (p.y - p.py) * alpha;
+    g.fillStyle(
+      0xf6efdf,
+      w.completedTicks < p.protectedUntil && w.completedTicks % 8 < 4
+        ? 0.45
+        : 1,
+    ).fillCircle(px, py, 14);
+    g.lineStyle(4, 0xf4ebd6).lineBetween(
+      px,
+      py,
+      px + 25 * Math.cos(p.aimRad),
+      py + 25 * Math.sin(p.aimRad),
     );
+    g.fillStyle(0x191a25).fillCircle(
+      px + 5 * Math.cos(p.aimRad),
+      py + 5 * Math.sin(p.aimRad),
+      4,
+    );
+    g.lineStyle(1, 0xc5b4fb, 0.8).strokeCircle(px, py, 21);
+    if (w.completedTicks < p.dashUntil)
+      g.lineStyle(2, 0xe1d1ff).strokeCircle(px, py, 29);
+    // Small aim reticle remains readable without relying on colour alone.
+    const rx = px + Math.cos(p.aimRad) * 90,
+      ry = py + Math.sin(p.aimRad) * 90;
+    g.lineStyle(1, 0xf7edda, 0.5).strokeCircle(rx, ry, 5);
+    for (const e of this.effects) {
+      if (w.running) e.age += Math.min(delta, 100);
+      const f = e.age / 350;
+      if (f >= 1) continue;
+      if (e.kind === "wave") {
+        g.lineStyle(
+          3,
+          e.echo ? 0xff8c7c : 0xc6b1fa,
+          (1 - f) * 0.7,
+        ).strokeCircle(e.x, e.y, e.radius * (0.3 + 0.7 * f));
+      } else if (!this.reduced) {
+        g.lineStyle(
+          2,
+          e.kind === "hurt" ? 0xff786e : e.echo ? 0xff8c7c : 0xf3cf8b,
+          1 - f,
+        ).strokeCircle(e.x, e.y, e.radius * (0.3 + f));
+      }
+    }
+    this.effects = this.effects.filter((e) => e.age < 350);
   }
 }

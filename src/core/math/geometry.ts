@@ -48,3 +48,35 @@ export function exitFraction(
 }
 export const lerpAngle = (a: number, b: number, t: number): number =>
   a + Math.atan2(Math.sin(b - a), Math.cos(b - a)) * t;
+
+export function segmentRect(
+  a: Vec2,
+  b: Vec2,
+  rect: { x: number; y: number; width: number; height: number },
+  padding = 0,
+): number | null {
+  let lo = 0,
+    hi = 1;
+  for (const [pos, delta, min, max] of [
+    [a.x, b.x - a.x, rect.x - padding, rect.x + rect.width + padding],
+    [a.y, b.y - a.y, rect.y - padding, rect.y + rect.height + padding],
+  ]) {
+    if (
+      pos === undefined ||
+      delta === undefined ||
+      min === undefined ||
+      max === undefined
+    )
+      return null;
+    if (Math.abs(delta) < 1e-12) {
+      if (pos < min || pos > max) return null;
+      continue;
+    }
+    const u = (min - pos) / delta,
+      v = (max - pos) / delta;
+    lo = Math.max(lo, Math.min(u, v));
+    hi = Math.min(hi, Math.max(u, v));
+    if (lo > hi) return null;
+  }
+  return lo;
+}

@@ -1,21 +1,22 @@
+import { CONFIG as C } from "../config";
 import type { EchoClip, Pose, RecordedAttack } from "../types";
 export class EchoRecorder {
-  poses: Pose[] = [];
-  events: RecordedAttack[] = [];
+  readonly poses: Pose[] = [];
+  readonly events: RecordedAttack[] = [];
   constructor(
     readonly startPose: Pose,
-    readonly startCompletedTick: number,
+    readonly round: number,
   ) {}
   get canRecord(): boolean {
-    return this.events.length < 256;
+    return this.events.length < C.eventCap;
   }
   record(event: RecordedAttack): void {
-    if (!this.canRecord) throw new Error("clip event capacity");
+    if (!this.canRecord) throw Error("History event limit");
     this.events.push(event);
   }
   seal(clipId: number): EchoClip {
-    if (this.poses.length !== 360)
-      throw new Error("A clip must contain exactly 360 poses");
+    if (this.poses.length < 1 || this.poses.length > C.roundTicks)
+      throw Error("Invalid history duration");
     const freeze = <T>(v: T): T => {
       if (v && typeof v === "object") {
         Object.values(v).forEach(freeze);
@@ -25,11 +26,10 @@ export class EchoRecorder {
     };
     return freeze(
       structuredClone({
-        schemaVersion: 1 as const,
         clipId,
-        startCompletedTick: this.startCompletedTick,
-        durationTicks: 360 as const,
+        round: this.round,
         startPose: this.startPose,
+        durationTicks: this.poses.length,
         poses: this.poses,
         events: this.events,
       }),

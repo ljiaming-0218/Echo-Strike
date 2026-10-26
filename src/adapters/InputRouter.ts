@@ -1,14 +1,19 @@
 import { direction } from "../core/math/geometry";
-import type { InputCommand } from "../core/types";
+import type { InputCommand, Vec2 } from "../core/types";
 export class InputRouter {
   private keys = new Set<string>();
-  private stick = { x: 0, y: 0 };
+  private move = { x: 0, y: 0 };
+  private aim = -Math.PI / 2;
+  private pointer: Vec2 | null = null;
+  private usingTouch = false;
+  private firing = false;
+  private touchFiring = false;
   private dash = false;
-  private wave = false;
-  private joystickId: number | null = null;
+  private pulse = false;
   private disposers: (() => void)[] = [];
   constructor(
     private readonly canAct: () => boolean,
+    private readonly player: () => Vec2,
     onPause: () => void,
   ) {
     this.listen(window, "keydown", (raw: Event) => {
@@ -28,96 +33,149 @@ export class InputRouter {
       this.keys.add(e.code);
       if (!e.repeat) {
         if (e.code === "Space") this.dash = true;
-        if (e.code === "KeyQ") this.wave = true;
+        if (e.code === "KeyQ") this.pulse = true;
       }
     });
-    this.listen(window, "keyup", (raw: Event) => {
-      this.keys.delete((raw as KeyboardEvent).code);
+    this.listen(window, "keyup", (raw: Event) =>
+      this.keys.delete((raw as KeyboardEvent).code),
+    );
+    this.listen(window, "pointermove", (raw: Event) => {
+      const e = raw as PointerEvent;
+      if (e.pointerType === "touch") return;
+      this.mouseAim(e);
     });
+    this.listen(window, "pointerdown", (raw: Event) => {
+      const e = raw as PointerEvent;
+      if (
+        e.pointerType === "touch" ||
+        e.button !== 0 ||
+        !(e.target instanceof HTMLCanvasElement) ||
+        !this.canAct()
+      )
+        return;
+      this.mouseAim(e);
+      this.firing = true;
+    });
+    for (const type of ["pointerup", "pointercancel"])
+      this.listen(window, type, (e: Event) => {
+        if ((e as PointerEvent).pointerType !== "touch") this.firing = false;
+      });
+  }
+  private mouseAim(e: PointerEvent): void {
+    const rect = document.querySelector("canvas")?.getBoundingClientRect();
+    if (!rect || rect.width === 0) return;
+    this.pointer = {
+      x: ((e.clientX - rect.left) * 1280) / rect.width,
+      y: ((e.clientY - rect.top) * 720) / rect.height,
+    };
+    this.usingTouch = false;
   }
   private listen(target: EventTarget, type: string, fn: EventListener): void {
     target.addEventListener(type, fn);
     this.disposers.push(() => target.removeEventListener(type, fn));
   }
   bindTouch(
-    stick: HTMLElement,
-    knob: HTMLElement,
+    move: HTMLElement,
+    aim: HTMLElement,
     dash: HTMLElement,
-    wave: HTMLElement,
+    pulse: HTMLElement,
   ): void {
-    const update = (e: PointerEvent) => {
-      const r = stick.getBoundingClientRect(),
-        dx = (e.clientX - r.left - r.width / 2) / (r.width * 0.36),
-        dy = (e.clientY - r.top - r.height / 2) / (r.height * 0.36),
-        v = direction(dx, dy);
-      this.stick = Math.hypot(v.x, v.y) < 0.15 ? { x: 0, y: 0 } : v;
-      knob.style.transform = `translate(${this.stick.x * 28}px,${this.stick.y * 28}px)`;
-    };
-    this.listen(stick, "pointerdown", (raw: Event) => {
-      const e = raw as PointerEvent;
-      if (!this.canAct() || this.joystickId !== null) return;
-      e.preventDefault();
-      this.joystickId = e.pointerId;
-      stick.setPointerCapture(e.pointerId);
-      update(e);
-    });
-    this.listen(stick, "pointermove", (raw: Event) => {
-      const e = raw as PointerEvent;
-      if (e.pointerId === this.joystickId) update(e);
-    });
-    for (const type of ["pointerup", "pointercancel", "lostpointercapture"])
-      this.listen(stick, type, (raw: Event) => {
-        if ((raw as PointerEvent).pointerId !== this.joystickId) return;
-        this.joystickId = null;
-        this.stick = { x: 0, y: 0 };
-        knob.style.transform = "";
-      });
-    for (const [button, kind] of [
-      [dash, "dash"],
-      [wave, "wave"],
+    for (const [element, kind] of [
+      [move, "move"],
+      [aim, "aim"],
     ] as const) {
-      this.listen(button, "pointerdown", (raw: Event) => {
+      let pointer: number | null = null;
+      const knob = element.querySelector<HTMLElement>(".stick-knob")!;
+      const update = (e: PointerEvent) => {
+        const r = element.getBoundingClientRect(),
+          v = direction(
+            (e.clientX - r.left - r.width / 2) / (r.width * 0.35),
+            (e.clientY - r.top - r.height / 2) / (r.height * 0.35),
+          ),
+          active = Math.hypot(v.x, v.y) > 0.15;
+        knob.style.transform = `translate(${v.x * 22}px,${v.y * 22}px)`;
+        if (kind === "move") this.move = active ? v : { x: 0, y: 0 };
+        else {
+          this.touchFiring = active;
+          this.usingTouch = true;
+          if (active) this.aim = Math.atan2(v.y, v.x);
+        }
+      };
+      this.listen(element, "pointerdown", (raw: Event) => {
         const e = raw as PointerEvent;
-        if (!this.canAct()) return;
+        if (!this.canAct() || pointer !== null) return;
         e.preventDefault();
-        button.setPointerCapture(e.pointerId);
-        if (kind === "dash") this.dash = true;
-        else this.wave = true;
+        pointer = e.pointerId;
+        element.setPointerCapture(pointer);
+        update(e);
       });
-      // Keyboard/accessibility activation also submits exactly one edge.
-      this.listen(button, "click", (raw: Event) => {
-        if ((raw as MouseEvent).detail !== 0 || !this.canAct()) return;
+      this.listen(element, "pointermove", (raw: Event) => {
+        const e = raw as PointerEvent;
+        if (e.pointerId === pointer) update(e);
+      });
+      const clear = () => {
+        pointer = null;
+        knob.style.transform = "";
+        if (kind === "move") this.move = { x: 0, y: 0 };
+        else this.touchFiring = false;
+      };
+      for (const type of ["pointerup", "pointercancel", "lostpointercapture"])
+        this.listen(element, type, (e: Event) => {
+          if ((e as PointerEvent).pointerId === pointer) clear();
+        });
+      this.disposers.push(clear);
+      this.clears.push(clear);
+    }
+    for (const [element, kind] of [
+      [dash, "dash"],
+      [pulse, "pulse"],
+    ] as const) {
+      const trigger = () => {
+        if (!this.canAct()) return;
         if (kind === "dash") this.dash = true;
-        else this.wave = true;
+        else this.pulse = true;
+      };
+      this.listen(element, "pointerdown", (e: Event) => {
+        e.preventDefault();
+        trigger();
+      });
+      this.listen(element, "click", (e: Event) => {
+        if ((e as MouseEvent).detail === 0) trigger();
       });
     }
   }
+  private clears: (() => void)[] = [];
   sample(): InputCommand {
+    if (this.pointer && !this.usingTouch) {
+      const p = this.player();
+      this.aim = Math.atan2(this.pointer.y - p.y, this.pointer.x - p.x);
+    }
     const key = (a: string, b: string) =>
       Number(this.keys.has(a) || this.keys.has(b));
-    const move = direction(
-      this.stick.x + key("KeyD", "ArrowRight") - key("KeyA", "ArrowLeft"),
-      this.stick.y + key("KeyS", "ArrowDown") - key("KeyW", "ArrowUp"),
+    const m = direction(
+      this.move.x + key("KeyD", "ArrowRight") - key("KeyA", "ArrowLeft"),
+      this.move.y + key("KeyS", "ArrowDown") - key("KeyW", "ArrowUp"),
     );
     const input = {
-      moveX: move.x,
-      moveY: move.y,
+      moveX: m.x,
+      moveY: m.y,
+      aimRad: this.aim,
+      firing: this.firing || this.touchFiring || this.keys.has("KeyJ"),
       dashPressed: this.dash,
-      shockwavePressed: this.wave,
+      pulsePressed: this.pulse,
     };
     this.dash = false;
-    this.wave = false;
+    this.pulse = false;
     return input;
   }
   clear(): void {
     this.keys.clear();
-    this.stick = { x: 0, y: 0 };
+    this.move = { x: 0, y: 0 };
+    this.firing = false;
+    this.touchFiring = false;
     this.dash = false;
-    this.wave = false;
-    this.joystickId = null;
-    document
-      .querySelector<HTMLElement>("#stick-knob")
-      ?.style.removeProperty("transform");
+    this.pulse = false;
+    this.clears.forEach((fn) => fn());
   }
   destroy(): void {
     this.clear();

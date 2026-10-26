@@ -9,7 +9,7 @@ export function createGame(parent: HTMLElement): Phaser.Game {
     parent,
     width: CONFIG.width,
     height: CONFIG.height,
-    backgroundColor: "#0c1219",
+    backgroundColor: "#0e1018",
     // No Arcade/Matter physics; later simulation belongs to the pure core.
     scale: { mode: Phaser.Scale.FIT, autoCenter: Phaser.Scale.CENTER_BOTH },
     scene: [BootScene, ArenaScene],
