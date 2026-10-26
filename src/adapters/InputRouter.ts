@@ -1,3 +1,4 @@
+import { canvasPoint, screenVector } from "./DisplayMode";
 import { direction } from "../core/math/geometry";
 import type { InputCommand, Vec2 } from "../core/types";
 export class InputRouter {
@@ -64,10 +65,13 @@ export class InputRouter {
   private mouseAim(e: PointerEvent): void {
     const rect = document.querySelector("canvas")?.getBoundingClientRect();
     if (!rect || rect.width === 0) return;
-    this.pointer = {
-      x: ((e.clientX - rect.left) * 1280) / rect.width,
-      y: ((e.clientY - rect.top) * 720) / rect.height,
-    };
+    this.pointer = canvasPoint(
+      rect,
+      e.clientX,
+      e.clientY,
+      document.querySelector<HTMLElement>("#viewport")?.dataset.rotated ===
+        "true",
+    );
     this.usingTouch = false;
   }
   private listen(target: EventTarget, type: string, fn: EventListener): void {
@@ -88,9 +92,15 @@ export class InputRouter {
       const knob = element.querySelector<HTMLElement>(".stick-knob")!;
       const update = (e: PointerEvent) => {
         const r = element.getBoundingClientRect(),
+          local = screenVector(
+            e.clientX - r.left - r.width / 2,
+            e.clientY - r.top - r.height / 2,
+            document.querySelector<HTMLElement>("#viewport")?.dataset
+              .rotated === "true",
+          ),
           v = direction(
-            (e.clientX - r.left - r.width / 2) / (r.width * 0.35),
-            (e.clientY - r.top - r.height / 2) / (r.height * 0.35),
+            local.x / (r.width * 0.35),
+            local.y / (r.height * 0.35),
           ),
           active = Math.hypot(v.x, v.y) > 0.15;
         knob.style.transform = `translate(${v.x * 22}px,${v.y * 22}px)`;

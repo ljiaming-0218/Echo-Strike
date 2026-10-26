@@ -48,8 +48,7 @@ svg {
 #game {
   position: relative;
   width: 100%;
-  height: 100vh;
-  height: 100dvh;
+  height: 100%;
   overflow: hidden;
   touch-action: none;
 }
@@ -57,7 +56,7 @@ svg {
   display: block;
 }
 #interface {
-  position: fixed;
+  position: absolute;
   inset: 0;
   pointer-events: none;
   padding: max(22px, env(safe-area-inset-top))
@@ -679,329 +678,323 @@ kbd {
   clip-path: inset(50%);
   white-space: nowrap;
 }
-@media (pointer: coarse) {
-  body {
-    overscroll-behavior: none;
-  }
-  .desktop-help {
-    display: none;
-  }
-  .stick {
-    width: 94px;
-    height: 94px;
-    border: 1px solid #9c83bc77;
-    background: #8d65b514;
-    border-radius: 50%;
-    display: grid;
-    place-items: center;
-    position: relative;
-    touch-action: none;
-  }
-  .stick-knob {
-    width: 37px;
-    height: 37px;
-    border: 1px solid #c1a0e7aa;
-    background: #ad87d13b;
-    border-radius: 50%;
-  }
-  .stick > span {
-    position: absolute;
-    font-size: 8px;
-    bottom: 8px;
-    pointer-events: none;
-    color: #b59bc8;
-  }
-  .aim-stick {
-    border-color: #f0988977;
-    background: #b6645114;
-  }
-  .aim-stick .stick-knob {
-    border-color: #ef9d8b99;
-    background: #e88b7030;
-  }
-  .aim-stick > span {
-    color: #ce9c90;
-  }
-  .skills {
-    margin-left: auto;
-  }
-  .skills button {
-    min-width: 100px;
-    min-height: 48px;
-    padding: 8px 12px;
-  }
-  .settings label {
-    min-height: 48px;
-  }
-  .controls {
-    bottom: max(14px, env(safe-area-inset-bottom));
-  }
+body {
+  overscroll-behavior: none;
 }
-@media (max-height: 600px) {
-  #interface {
-    padding: 10px max(18px, env(safe-area-inset-right)) 10px
-      max(18px, env(safe-area-inset-left));
-  }
-  .hud {
-    height: 42px;
-    gap: 20px;
-  }
-  .small-brand {
-    font-size: 13px;
-  }
-  .small-brand small {
-    font-size: 8px;
-  }
-  .health {
-    width: 105px;
-  }
-  .round-label b {
-    font-size: 20px;
-  }
-  .round-time {
-    width: 100px;
-    padding-left: 18px;
-    gap: 7px;
-  }
-  .round-time b {
-    font-size: 24px;
-  }
-  .round-time > span {
-    font-size: 8px;
-  }
-  .mission {
-    top: 76px;
-    left: 18px;
-    padding: 9px 11px;
-    width: 145px;
-  }
-  .mission-title {
-    font-size: 9px;
-  }
-  .mission p {
-    font-size: 10px;
-    margin: 9px 0;
-  }
-  .mission > div {
-    font-size: 8px;
-    margin-top: 9px;
-    padding-top: 8px;
-  }
-  .controls {
-    left: 18px;
-    right: 18px;
-    bottom: 12px;
-    gap: 12px;
-  }
-  .stick {
-    width: 84px;
-    height: 84px;
-  }
-  .skills {
-    gap: 8px;
-  }
-  .skills b {
-    font-size: 10px;
-  }
-  .skills small {
-    font-size: 8px;
-  }
-  .overlay {
-    padding: 20px 32px;
-  }
-  .menu-layout {
-    grid-template-columns: 1.2fr 0.8fr;
-    column-gap: 36px;
-    row-gap: 20px;
-    max-width: 900px;
-  }
-  .wordmark {
-    font-size: 10px;
-    margin-bottom: 15px;
-  }
-  .menu-copy h1 {
-    font-size: 30px;
-    line-height: 1.4;
-    letter-spacing: -1px;
-  }
-  .intro {
-    font-size: 11px;
-    margin: 12px 0 15px;
-  }
-  .primary {
-    min-height: 48px;
-    padding: 12px 17px;
-    font-size: 12px;
-  }
-  .menu-meta {
-    font-size: 8px;
-    margin-top: 10px;
-    gap: 9px;
-  }
-  .menu-art {
-    min-height: 220px;
-  }
-  .menu-bottom {
-    padding-top: 12px;
-    gap: 8px 20px;
-  }
-  .howto {
-    font-size: 8px;
-    gap: 16px;
-  }
-  .howto b {
-    font-size: 9px;
-    margin-bottom: 6px;
-  }
-  .input-help {
-    font-size: 8px;
-    line-height: 2;
-  }
-  .input-help small {
-    font-size: 7px;
-  }
-  .input-help kbd {
-    font-size: 8px;
-    padding: 2px 4px;
-  }
-  .settings {
-    font-size: 9px;
-    gap: 20px;
-  }
-  .settings label {
-    min-height: 26px;
-  }
-  .settings input[type="range"] {
-    height: 20px;
-    width: 80px;
-  }
-  .menu-bottom .settings {
-    grid-column: auto;
-  }
-  .review-layout {
-    gap: 40px;
-  }
-  .review-layout h1 {
-    font-size: 27px;
-    margin: 15px 0;
-  }
-  .review-layout p {
-    font-size: 10px;
-  }
-  .review-layout .danger-note {
-    font-size: 10px;
-    margin: 15px 0;
-  }
-  .review-hint {
-    font-size: 8px;
-    margin-top: 9px;
-  }
-  .section-label {
-    font-size: 9px;
-  }
-  .panel h1 {
-    font-size: 27px;
-    margin: 15px 0;
-  }
-  .panel > p {
-    font-size: 11px;
-    margin: 14px 0 20px;
-  }
-  .result-stats {
-    padding: 18px 0;
-    margin-bottom: 22px;
-  }
-  .result-stats b {
-    font-size: 26px;
-  }
-  .compact .settings {
-    margin-top: 15px;
-    padding-top: 10px;
-  }
+#viewport[data-mobile="true"] .desktop-help {
+  display: none;
 }
-@media (max-width: 580px) and (min-height: 601px) {
-  .overlay {
-    padding: 28px 24px;
-  }
-  .menu-layout {
-    grid-template-columns: 1fr;
-    row-gap: 30px;
-  }
-  .menu-art {
-    display: none;
-  }
-  .menu-copy h1 {
-    font-size: 38px;
-  }
-  .wordmark {
-    margin-bottom: 30px;
-  }
-  .menu-bottom {
-    grid-template-columns: 1fr;
-    gap: 20px;
-  }
-  .howto {
-    font-size: 9px;
-    justify-content: space-between;
-    gap: 15px;
-  }
-  .input-help {
-    text-align: left;
-  }
-  .menu-bottom .settings {
-    grid-column: auto;
-  }
-  .review-layout {
-    grid-template-columns: 1fr;
-    gap: 22px;
-  }
-  .review-layout h1 {
-    font-size: 30px;
-  }
-  .review-map {
-    max-width: 400px;
-  }
-  .panel h1 {
-    font-size: 28px;
-  }
-  .hud {
-    gap: 12px;
-  }
-  .small-brand {
-    font-size: 11px;
-  }
-  .health {
-    width: 65px;
-  }
-  .round-label {
-    font-size: 8px;
-  }
-  .round-label b {
-    font-size: 18px;
-  }
-  .round-time {
-    padding-left: 8px;
-    width: 65px;
-  }
-  .round-time b {
-    font-size: 21px;
-  }
-  .round-time > span {
-    display: none;
-  }
-  .mission {
-    top: 100px;
-  }
-  .skills {
-    gap: 8px;
-  }
-  .skills button {
-    min-width: 85px;
-    padding: 8px;
-  }
-  .controls {
-    gap: 8px;
-  }
+#viewport[data-mobile="true"] .stick {
+  width: 94px;
+  height: 94px;
+  border: 1px solid #9c83bc77;
+  background: #8d65b514;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  position: relative;
+  touch-action: none;
+}
+#viewport[data-mobile="true"] .stick-knob {
+  width: 37px;
+  height: 37px;
+  border: 1px solid #c1a0e7aa;
+  background: #ad87d13b;
+  border-radius: 50%;
+}
+#viewport[data-mobile="true"] .stick > span {
+  position: absolute;
+  font-size: 8px;
+  bottom: 8px;
+  pointer-events: none;
+  color: #b59bc8;
+}
+#viewport[data-mobile="true"] .aim-stick {
+  border-color: #f0988977;
+  background: #b6645114;
+}
+#viewport[data-mobile="true"] .aim-stick .stick-knob {
+  border-color: #ef9d8b99;
+  background: #e88b7030;
+}
+#viewport[data-mobile="true"] .aim-stick > span {
+  color: #ce9c90;
+}
+#viewport[data-mobile="true"] .skills {
+  margin-left: auto;
+}
+#viewport[data-mobile="true"] .skills button {
+  min-width: 100px;
+  min-height: 48px;
+  padding: 8px 12px;
+}
+#viewport[data-mobile="true"] .settings label {
+  min-height: 48px;
+}
+#viewport[data-mobile="true"] .controls {
+  bottom: max(14px, env(safe-area-inset-bottom));
+}
+#viewport[data-compact="true"] #interface {
+  padding: 10px max(18px, env(safe-area-inset-right)) 10px
+    max(18px, env(safe-area-inset-left));
+}
+#viewport[data-compact="true"] .hud {
+  height: 42px;
+  gap: 20px;
+}
+#viewport[data-compact="true"] .small-brand {
+  font-size: 13px;
+}
+#viewport[data-compact="true"] .small-brand small {
+  font-size: 8px;
+}
+#viewport[data-compact="true"] .health {
+  width: 105px;
+}
+#viewport[data-compact="true"] .round-label b {
+  font-size: 20px;
+}
+#viewport[data-compact="true"] .round-time {
+  width: 100px;
+  padding-left: 18px;
+  gap: 7px;
+}
+#viewport[data-compact="true"] .round-time b {
+  font-size: 24px;
+}
+#viewport[data-compact="true"] .round-time > span {
+  font-size: 8px;
+}
+#viewport[data-compact="true"] .mission {
+  top: 76px;
+  left: 18px;
+  padding: 9px 11px;
+  width: 145px;
+}
+#viewport[data-compact="true"] .mission-title {
+  font-size: 9px;
+}
+#viewport[data-compact="true"] .mission p {
+  font-size: 10px;
+  margin: 9px 0;
+}
+#viewport[data-compact="true"] .mission > div {
+  font-size: 8px;
+  margin-top: 9px;
+  padding-top: 8px;
+}
+#viewport[data-compact="true"] .controls {
+  left: 18px;
+  right: 18px;
+  bottom: 12px;
+  gap: 12px;
+}
+#viewport[data-compact="true"] .stick {
+  width: 84px;
+  height: 84px;
+}
+#viewport[data-compact="true"] .skills {
+  gap: 8px;
+}
+#viewport[data-compact="true"] .skills b {
+  font-size: 10px;
+}
+#viewport[data-compact="true"] .skills small {
+  font-size: 8px;
+}
+#viewport[data-compact="true"] .overlay {
+  padding: 20px 32px;
+}
+#viewport[data-compact="true"] .menu-layout {
+  grid-template-columns: 1.2fr 0.8fr;
+  column-gap: 36px;
+  row-gap: 20px;
+  max-width: 900px;
+}
+#viewport[data-compact="true"] .wordmark {
+  font-size: 10px;
+  margin-bottom: 15px;
+}
+#viewport[data-compact="true"] .menu-copy h1 {
+  font-size: 30px;
+  line-height: 1.4;
+  letter-spacing: -1px;
+}
+#viewport[data-compact="true"] .intro {
+  font-size: 11px;
+  margin: 12px 0 15px;
+}
+#viewport[data-compact="true"] .primary {
+  min-height: 48px;
+  padding: 12px 17px;
+  font-size: 12px;
+}
+#viewport[data-compact="true"] .menu-meta {
+  font-size: 8px;
+  margin-top: 10px;
+  gap: 9px;
+}
+#viewport[data-compact="true"] .menu-art {
+  min-height: 220px;
+}
+#viewport[data-compact="true"] .menu-bottom {
+  padding-top: 12px;
+  gap: 8px 20px;
+}
+#viewport[data-compact="true"] .howto {
+  font-size: 8px;
+  gap: 16px;
+}
+#viewport[data-compact="true"] .howto b {
+  font-size: 9px;
+  margin-bottom: 6px;
+}
+#viewport[data-compact="true"] .input-help {
+  font-size: 8px;
+  line-height: 2;
+}
+#viewport[data-compact="true"] .input-help small {
+  font-size: 7px;
+}
+#viewport[data-compact="true"] .input-help kbd {
+  font-size: 8px;
+  padding: 2px 4px;
+}
+#viewport[data-compact="true"] .settings {
+  font-size: 9px;
+  gap: 20px;
+}
+#viewport[data-compact="true"] .settings label {
+  min-height: 26px;
+}
+#viewport[data-compact="true"] .settings input[type="range"] {
+  height: 20px;
+  width: 80px;
+}
+#viewport[data-compact="true"] .menu-bottom .settings {
+  grid-column: auto;
+}
+#viewport[data-compact="true"] .review-layout {
+  gap: 40px;
+}
+#viewport[data-compact="true"] .review-layout h1 {
+  font-size: 27px;
+  margin: 15px 0;
+}
+#viewport[data-compact="true"] .review-layout p {
+  font-size: 10px;
+}
+#viewport[data-compact="true"] .review-layout .danger-note {
+  font-size: 10px;
+  margin: 15px 0;
+}
+#viewport[data-compact="true"] .review-hint {
+  font-size: 8px;
+  margin-top: 9px;
+}
+#viewport[data-compact="true"] .section-label {
+  font-size: 9px;
+}
+#viewport[data-compact="true"] .panel h1 {
+  font-size: 27px;
+  margin: 15px 0;
+}
+#viewport[data-compact="true"] .panel > p {
+  font-size: 11px;
+  margin: 14px 0 20px;
+}
+#viewport[data-compact="true"] .result-stats {
+  padding: 18px 0;
+  margin-bottom: 22px;
+}
+#viewport[data-compact="true"] .result-stats b {
+  font-size: 26px;
+}
+#viewport[data-compact="true"] .compact .settings {
+  margin-top: 15px;
+  padding-top: 10px;
+}
+#viewport[data-narrow="true"] .overlay {
+  padding: 28px 24px;
+}
+#viewport[data-narrow="true"] .menu-layout {
+  grid-template-columns: 1fr;
+  row-gap: 30px;
+}
+#viewport[data-narrow="true"] .menu-art {
+  display: none;
+}
+#viewport[data-narrow="true"] .menu-copy h1 {
+  font-size: 38px;
+}
+#viewport[data-narrow="true"] .wordmark {
+  margin-bottom: 30px;
+}
+#viewport[data-narrow="true"] .menu-bottom {
+  grid-template-columns: 1fr;
+  gap: 20px;
+}
+#viewport[data-narrow="true"] .howto {
+  font-size: 9px;
+  justify-content: space-between;
+  gap: 15px;
+}
+#viewport[data-narrow="true"] .input-help {
+  text-align: left;
+}
+#viewport[data-narrow="true"] .menu-bottom .settings {
+  grid-column: auto;
+}
+#viewport[data-narrow="true"] .review-layout {
+  grid-template-columns: 1fr;
+  gap: 22px;
+}
+#viewport[data-narrow="true"] .review-layout h1 {
+  font-size: 30px;
+}
+#viewport[data-narrow="true"] .review-map {
+  max-width: 400px;
+}
+#viewport[data-narrow="true"] .panel h1 {
+  font-size: 28px;
+}
+#viewport[data-narrow="true"] .hud {
+  gap: 12px;
+}
+#viewport[data-narrow="true"] .small-brand {
+  font-size: 11px;
+}
+#viewport[data-narrow="true"] .health {
+  width: 65px;
+}
+#viewport[data-narrow="true"] .round-label {
+  font-size: 8px;
+}
+#viewport[data-narrow="true"] .round-label b {
+  font-size: 18px;
+}
+#viewport[data-narrow="true"] .round-time {
+  padding-left: 8px;
+  width: 65px;
+}
+#viewport[data-narrow="true"] .round-time b {
+  font-size: 21px;
+}
+#viewport[data-narrow="true"] .round-time > span {
+  display: none;
+}
+#viewport[data-narrow="true"] .mission {
+  top: 100px;
+}
+#viewport[data-narrow="true"] .skills {
+  gap: 8px;
+}
+#viewport[data-narrow="true"] .skills button {
+  min-width: 85px;
+  padding: 8px;
+}
+#viewport[data-narrow="true"] .controls {
+  gap: 8px;
 }
 @media (prefers-reduced-motion: reduce) {
   * {
@@ -1010,40 +1003,206 @@ kbd {
   }
 }
 
-@media (max-height: 600px) {
-  .menu-art {
-    width: 210px;
-    height: 210px;
-    min-height: 0;
-    aspect-ratio: auto;
-    justify-self: center;
-  }
-  .menu-layout {
-    row-gap: 16px;
-  }
-  .howto {
-    font-size: 10px;
-  }
+#viewport[data-compact="true"] .menu-art {
+  width: 210px;
+  height: 210px;
+  min-height: 0;
+  aspect-ratio: auto;
+  justify-self: center;
 }
-@media (pointer: coarse) and (max-height: 600px) {
-  .overlay {
-    padding-top: 16px;
-    padding-bottom: 16px;
-  }
-  .input-help > span {
-    display: none;
-  }
-  .input-help small {
-    display: block;
-    font-size: 10px;
-    line-height: 1.8;
-  }
-  .settings label {
-    min-height: 40px;
-  }
+
+#viewport[data-compact="true"] .menu-layout {
+  row-gap: 16px;
 }
-@media (max-height: 600px) {
-  .menu-art > p {
-    display: none;
-  }
+
+#viewport[data-compact="true"] .howto {
+  font-size: 10px;
+}
+#viewport[data-compact="true"][data-mobile="true"] .overlay {
+  padding-top: 16px;
+  padding-bottom: 16px;
+}
+#viewport[data-compact="true"][data-mobile="true"] .input-help > span {
+  display: none;
+}
+#viewport[data-compact="true"][data-mobile="true"] .input-help small {
+  display: block;
+  font-size: 10px;
+  line-height: 1.8;
+}
+#viewport[data-compact="true"][data-mobile="true"] .settings label {
+  min-height: 40px;
+}
+#viewport[data-compact="true"] .menu-art > p {
+  display: none;
+}
+
+#viewport {
+  position: fixed;
+  left: 0;
+  top: 0;
+  overflow: hidden;
+  background: #0b111d;
+}
+#viewport[data-rotated="true"] {
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%) rotate(90deg);
+}
+#game canvas {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  margin: 0 !important;
+}
+.display-button {
+  background: transparent;
+  border: 1px solid #594c72;
+  border-radius: 5px;
+  min-height: 48px;
+  padding: 10px 14px;
+  color: #d8c6ef;
+  font-size: 11px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+}
+.display-button:hover {
+  background: #2c2540;
+}
+.display-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 22px;
+  flex-wrap: wrap;
+}
+.display-note {
+  font-size: 11px !important;
+  color: #aa9cba;
+  line-height: 1.8;
+}
+.portrait-actions {
+  display: grid;
+  gap: 12px;
+  max-width: 340px;
+  margin: 25px auto 0;
+}
+#display {
+  width: 48px;
+  padding: 8px;
+  flex-shrink: 0;
+}
+#viewport[data-compact="true"] .display-actions {
+  margin-top: 12px;
+}
+#viewport[data-compact="true"] .menu-bottom {
+  row-gap: 8px;
+}
+#viewport[data-compact="true"] .hud {
+  gap: 16px;
+}
+#viewport[data-compact="true"] .menu-copy h1 {
+  font-size: 28px;
+}
+#viewport[data-compact="true"] .intro {
+  margin: 10px 0 12px;
+}
+#viewport[data-compact="true"] .display-button {
+  font-size: 10px;
+}
+#viewport[data-compact="true"] .menu-layout {
+  row-gap: 12px;
+}
+#viewport[data-compact="true"] .menu-copy .display-actions .display-button {
+  min-height: 40px;
+  padding: 8px 12px;
+}
+.settings .display-button {
+  margin-left: auto;
+  white-space: nowrap;
+}
+#viewport[data-compact="true"] .menu-bottom .settings {
+  grid-column: 1/-1;
+  gap: 20px;
+}
+#viewport[data-compact="true"] .settings .display-button {
+  min-height: 40px;
+  padding: 8px 12px;
+}
+#viewport[data-compact="true"] .hud .health {
+  width: 90px;
+}
+#viewport[data-compact="true"] .hud {
+  gap: 12px;
+}
+#viewport[data-compact="true"] .mission {
+  top: 80px;
+}
+/* Asset-backed time laboratory; interface labels remain native and readable. */
+.menu-art {
+  background: radial-gradient(ellipse at center, #17203922, transparent 70%);
+}
+.menu-art:before {
+  inset: 9%;
+  background: url("/assets/chrono-lab.webp") center/cover;
+  opacity: 0.2;
+  filter: none;
+  mask-image: radial-gradient(#000 30%, transparent 73%);
+}
+.self {
+  background: transparent !important;
+  border-color: transparent !important;
+}
+.self:before {
+  content: "";
+  position: absolute;
+  inset: -23px;
+  background: url("/assets/chrono-agent.webp") center/contain no-repeat;
+}
+.self:after {
+  display: none;
+}
+.self-two:before {
+  filter: sepia(0.65) saturate(2.5) hue-rotate(310deg);
+}
+.self-three:before {
+  filter: sepia(0.5) saturate(2) hue-rotate(305deg);
+}
+.small-brand,
+.health,
+.round-label,
+.round-time {
+  text-shadow: 0 2px 6px #020610;
+}
+.health {
+  background: #101725ce;
+  padding: 8px 10px;
+  border: 1px solid #7b6c9c55;
+  border-radius: 5px;
+}
+.mission {
+  background: linear-gradient(120deg, #0b1325ef, #1b1935c9);
+  border: 1px solid #8272b744;
+  border-left: 2px solid #c5b0f1;
+  box-shadow: 0 10px 25px #01040c66;
+  backdrop-filter: blur(8px);
+}
+.skills button {
+  background: linear-gradient(155deg, #2c3044ed, #111c2dee);
+  border-color: #8172ab;
+  box-shadow:
+    inset 0 1px 0 #d8c8ed33,
+    0 5px 18px #03071188;
+}
+.icon-button,
+.display-button {
+  background-color: #0e1726d9;
+  backdrop-filter: blur(6px);
+}
+.stick {
+  box-shadow:
+    inset 0 0 22px #b7a6f510,
+    0 0 25px #05091944;
 }

@@ -95,7 +95,7 @@ export interface Relay {
 export type State = "menu" | "running" | "review" | "victory" | "defeat";
 export type PauseReason = "manual" | "hidden" | "portrait" | "performance";
 export type VisualEvent = {
-  kind: "shot" | "wave" | "hurt" | "kill" | "cycle" | "dash";
+  kind: "shot" | "wave" | "hurt" | "hit" | "kill" | "cycle" | "dash";
   x: number;
   y: number;
   radius: number;

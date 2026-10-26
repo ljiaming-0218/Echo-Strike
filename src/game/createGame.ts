@@ -11,7 +11,9 @@ export function createGame(parent: HTMLElement): Phaser.Game {
     height: CONFIG.height,
     backgroundColor: "#0e1018",
     // No Arcade/Matter physics; later simulation belongs to the pure core.
-    scale: { mode: Phaser.Scale.FIT, autoCenter: Phaser.Scale.CENTER_BOTH },
+    // DisplayMode performs FIT sizing in local CSS coordinates, including rotated
+    // embedded-browser layouts. The simulation and render buffer remain 1280×720.
+    scale: { mode: Phaser.Scale.NONE, autoCenter: Phaser.Scale.NO_CENTER },
     scene: [BootScene, ArenaScene],
   });
 }

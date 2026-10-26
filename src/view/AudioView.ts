@@ -25,6 +25,7 @@ export class AudioView {
     const event =
       events.find(
         (e) =>
+          e.kind === "hit" ||
           e.kind === "hurt" ||
           e.kind === "wave" ||
           e.kind === "cycle" ||
@@ -36,15 +37,17 @@ export class AudioView {
     if (!event) return;
     this.lastTick = tick;
     const frequency =
-      event.kind === "hurt"
-        ? 95
-        : event.kind === "wave"
-          ? 160
-          : event.kind === "cycle"
-            ? 620
-            : event.kind === "kill"
-              ? 280
-              : 440;
+      event.kind === "hit"
+        ? 820
+        : event.kind === "hurt"
+          ? 95
+          : event.kind === "wave"
+            ? 160
+            : event.kind === "cycle"
+              ? 620
+              : event.kind === "kill"
+                ? 280
+                : 440;
     try {
       const osc = c.createOscillator(),
         gain = c.createGain(),

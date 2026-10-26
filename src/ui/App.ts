@@ -1,3 +1,4 @@
+import { DisplayMode } from "../adapters/DisplayMode";
 import { World } from "../core/World";
 import { CONFIG as C } from "../core/config";
 import { FixedStepClock } from "../core/clock/FixedStepClock";
@@ -13,6 +14,10 @@ export class App {
   readonly settings = loadSettings();
   readonly audio = new AudioView();
   readonly input: InputRouter;
+  readonly display = new DisplayMode(
+    document.querySelector<HTMLElement>("#viewport")!,
+  );
+  private displayPending = false;
   private root = document.createElement("div");
   private overlay!: HTMLElement;
   private screen = "";
@@ -34,11 +39,12 @@ export class App {
   }
   mount(): void {
     this.root.id = "interface";
-    this.root.innerHTML = `<header id="hud" class="hud" hidden><div class="small-brand">CHRONO<span>HUNT</span><small>时间追猎</small></div><div class="health"><span>当前的你 <b id="hp-value">100</b></span><div class="track"><i id="hp-fill"></i></div></div><div class="round-label">循环 <b id="round-value">01</b><span> / 06</span></div><div class="round-time"><b id="time-value">12.0</b><span>秒后闭合</span></div><button id="pause" class="icon-button" aria-label="暂停游戏"><svg viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M8 5v14M16 5v14"/></svg></button></header>
+    this.root.innerHTML = `<header id="hud" class="hud" hidden><div class="small-brand">CHRONO<span>HUNT</span><small>时间追猎</small></div><div class="health"><span>当前的你 <b id="hp-value">100</b></span><div class="track"><i id="hp-fill"></i></div></div><div class="round-label">循环 <b id="round-value">01</b><span> / 06</span></div><div class="round-time"><b id="time-value">12.0</b><span>秒后闭合</span></div><button id="display" class="display-button" aria-label="全屏横屏"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M8 3H3v5m13-5h5v5M3 16v5h5m13-5v5h-5"/></svg></button><button id="pause" class="icon-button" aria-label="暂停游戏"><svg viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M8 5v14M16 5v14"/></svg></button></header>
   <aside id="mission" class="mission" hidden><span class="mission-title">撤离条件</span><p id="relay-label">时间锚 0 / 3</p><p id="echo-label">敌对过去 0 / 0</p><div id="gate-label">击破所有目标，解锁出口</div></aside>
   <div id="controls" class="controls" hidden><div id="move-stick" class="stick move-stick" aria-label="移动摇杆"><div class="stick-knob"></div><span>移动</span></div><div class="desktop-help"><kbd>WASD</kbd> 移动 <span>·</span> 鼠标瞄准 / 按住左键开火</div><div class="skills"><button id="dash" aria-label="相位冲刺"><b>相位冲刺</b><small id="dash-cd">SPACE · 就绪</small></button><button id="pulse" aria-label="抹除脉冲"><b>抹除脉冲</b><small id="pulse-cd">Q · 本轮 1 次</small></button></div><div id="aim-stick" class="stick aim-stick" aria-label="瞄准射击摇杆"><div class="stick-knob"></div><span>瞄准 / 开火</span></div></div>
   <section id="overlay" class="overlay" aria-live="polite"></section>`;
-    document.body.append(this.root);
+    this.display.stage.append(this.root);
+    this.el("display").onclick = () => this.toggleDisplay();
     this.overlay = this.el("overlay");
     this.el("pause").onclick = () => this.togglePause();
     this.input.bindTouch(
@@ -60,6 +66,12 @@ export class App {
       if (!document.hidden) this.world.clearReason("hidden");
     });
     on(window, "resize", () => this.orientation());
+    on(window, "orientationchange", () => this.orientation());
+    if (screen.orientation)
+      on(screen.orientation, "change", () => this.orientation());
+    on(document, "fullscreenchange", () => this.orientation());
+    if (window.visualViewport)
+      on(window.visualViewport, "resize", () => this.orientation());
     this.orientation();
     this.renderUI();
     if (import.meta.env.MODE === "e2e")
@@ -77,13 +89,42 @@ export class App {
     this.audio.pause();
   }
   private orientation(): void {
-    if (innerHeight > innerWidth && matchMedia("(pointer:coarse)").matches)
-      this.freeze("portrait");
+    this.display.update();
+    if (this.display.needsLandscape) this.freeze("portrait");
     else this.world.clearReason("portrait");
     this.input.clear();
     this.clock.reset();
     this.discardDelta = true;
     this.renderUI();
+  }
+  private toggleDisplay(): void {
+    if (this.display.rotated) {
+      this.display.auto();
+      this.orientation();
+    } else void this.changeDisplay(true, false);
+  }
+  private async changeDisplay(
+    native: boolean,
+    proceed: boolean,
+  ): Promise<void> {
+    if (this.displayPending) return;
+    this.displayPending = true;
+    const running = this.world.running;
+    if (running) this.freeze("manual");
+    try {
+      if (native) await this.display.requestLandscape();
+      else this.display.adapt();
+      this.orientation();
+      if (proceed && this.world.state === "menu") this.start();
+      else if (
+        (running || proceed) &&
+        (this.world.state === "running" || this.world.state === "review")
+      )
+        this.resume();
+    } finally {
+      this.displayPending = false;
+      this.renderUI();
+    }
   }
   private togglePause(): void {
     if (this.world.running) this.freeze("manual");
@@ -151,8 +192,8 @@ export class App {
     this.view.render(this.world, alpha, delta);
     this.renderUI();
   }
-  private settingsMarkup(): string {
-    return `<div class="settings"><label>音量<input id="volume" type="range" aria-label="音量" min="0" max="1" step=".05" value="${this.settings.volume}"></label><label><input id="reduced" type="checkbox" ${this.settings.reduced ? "checked" : ""}>减少特效</label></div>`;
+  private settingsMarkup(display = false): string {
+    return `<div class="settings"><label>音量<input id="volume" type="range" aria-label="音量" min="0" max="1" step=".05" value="${this.settings.volume}"></label><label><input id="reduced" type="checkbox" ${this.settings.reduced ? "checked" : ""}>减少特效</label>${display ? `<button id="display-menu" class="display-button">${this.display.rotated ? "恢复自动布局" : "全屏 / 横屏体验"}</button>` : ""}</div>`;
   }
   private bindSettings(): void {
     const volume = this.overlay.querySelector<HTMLInputElement>("#volume"),
@@ -195,6 +236,16 @@ export class App {
   renderUI(): void {
     const w = this.world,
       active = w.state !== "menu";
+    const displayButton = this.el("display"),
+      displayLabel = this.display.rotated ? "恢复自动布局" : "全屏横屏";
+    displayButton.setAttribute("aria-label", displayLabel);
+    displayButton.title = displayLabel;
+    if (displayButton.dataset.mode !== displayLabel) {
+      displayButton.dataset.mode = displayLabel;
+      displayButton.innerHTML = this.display.rotated
+        ? '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M5 8a8 8 0 1 1-1 7M5 3v5h5"/></svg>'
+        : '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M8 3H3v5m13-5h5v5M3 16v5h5m13-5v5h-5"/></svg>';
+    }
     for (const id of ["hud", "mission", "controls"])
       this.el(id).hidden = !active;
     if (w.completedTicks !== this.hudTick || this.hudTick === -1) {
@@ -230,10 +281,9 @@ export class App {
         : "本轮已使用";
       this.el("pulse").classList.toggle("spent", !w.player.pulseAvailable);
     }
-    const portrait =
-      innerHeight > innerWidth && matchMedia("(pointer:coarse)").matches;
+    const portrait = this.display.needsLandscape;
     const state = portrait ? "portrait" : w.status,
-      key = `${state}/${w.round}/${[...w.pauses].sort().join(",")}`;
+      key = `${state}/${this.display.rotated}/${w.round}/${[...w.pauses].sort().join(",")}`;
     if (key === this.screen) return;
     this.screen = key;
     this.overlay.hidden = state === "running";
@@ -241,13 +291,17 @@ export class App {
     this.input.clear();
     this.audio.pause();
     if (state === "menu") {
-      this.overlay.innerHTML = `<div class="menu-layout"><div class="menu-copy"><div class="wordmark">CHRONO<span>HUNT</span></div><h1>你唯一的敌人，<br>是上一轮的你。</h1><p class="intro">瞄准。开火。撤离。<br>你刚刚做过的一切，将在下一轮追猎你。</p><button id="start" class="primary">进入时间循环 ${arrow}</button><div class="menu-meta"><span>6 轮对抗</span><i></i><span>每轮最多 12 秒</span><i></i><span>最多 3 个过去</span></div></div><div class="menu-art" aria-hidden="true"><div class="orbit orbit-outer"></div><div class="orbit orbit-inner"></div><div class="self self-one"><i></i><span>现在</span></div><div class="self self-two"><i></i><span>过去 #1</span></div><div class="self self-three"><i></i><span>过去 #2</span></div><div class="cross-line line-one"></div><div class="cross-line line-two"></div><p>YOUR PAST IS ARMED.</p></div><div class="menu-bottom"><div class="howto"><span><b>01</b> 射击击破 3 个时间锚</span><span><b>02</b> 击败重演旧动作的自己</span><span><b>03</b> 在循环闭合前抵达出口</span></div><div class="input-help"><span><kbd>WASD</kbd> 移动 · 鼠标瞄准 / 左键开火</span><span><kbd>SPACE</kbd> 冲刺 · <kbd>Q</kbd> 清弹 / 伤害附近分身</span><small>手机横屏：左摇杆移动，右摇杆瞄准开火</small></div>${this.settingsMarkup()}</div></div>`;
+      this.overlay.innerHTML = `<div class="menu-layout"><div class="menu-copy"><div class="wordmark">CHRONO<span>HUNT</span></div><h1>你唯一的敌人，<br>是上一轮的你。</h1><p class="intro">瞄准。开火。撤离。<br>你刚刚做过的一切，将在下一轮追猎你。</p><button id="start" class="primary">进入时间循环 ${arrow}</button><div class="menu-meta"><span>6 轮对抗</span><i></i><span>每轮最多 12 秒</span><i></i><span>最多 3 个过去</span></div></div><div class="menu-art" aria-hidden="true"><div class="orbit orbit-outer"></div><div class="orbit orbit-inner"></div><div class="self self-one"><i></i><span>现在</span></div><div class="self self-two"><i></i><span>过去 #1</span></div><div class="self self-three"><i></i><span>过去 #2</span></div><div class="cross-line line-one"></div><div class="cross-line line-two"></div><p>YOUR PAST IS ARMED.</p></div><div class="menu-bottom"><div class="howto"><span><b>01</b> 射击击破 3 个时间锚</span><span><b>02</b> 击败重演旧动作的自己</span><span><b>03</b> 在循环闭合前抵达出口</span></div><div class="input-help"><span><kbd>WASD</kbd> 移动 · 鼠标瞄准 / 左键开火</span><span><kbd>SPACE</kbd> 冲刺 · <kbd>Q</kbd> 清弹 / 伤害附近分身</span><small>手机横屏：左摇杆移动，右摇杆瞄准开火</small></div>${this.settingsMarkup(true)}</div></div>`;
       this.el("start").onclick = () => this.start();
+      this.el("display-menu").onclick = () => this.toggleDisplay();
       this.bindSettings();
-    } else if (state === "portrait")
-      this.overlay.innerHTML =
-        '<div class="panel"><div class="rotate-phone"></div><h1>请横屏后继续</h1><p>左手移动，右手瞄准。让过去的自己先走一步。</p></div>';
-    else if (state === "paused") {
+    } else if (state === "portrait") {
+      this.overlay.innerHTML = `<div class="panel"><div class="rotate-phone"></div><h1>请横屏后继续</h1><p>微信 / QQ 内可以直接横向适配。<br>将手机横握，即可使用双摇杆。</p><div class="portrait-actions"><button id="adapt-landscape" class="primary">横向适配${w.state === "menu" ? "并开始" : "并继续"} ${arrow}</button><button id="request-landscape" class="display-button">尝试全屏横屏</button></div><p class="display-note">也可关闭系统竖屏锁定后旋转手机。<br>当前浏览器不支持全屏时，横向适配仍然可用。</p></div>`;
+      this.el("adapt-landscape").onclick = () =>
+        void this.changeDisplay(false, true);
+      this.el("request-landscape").onclick = () =>
+        void this.changeDisplay(true, true);
+    } else if (state === "paused") {
       this.overlay.innerHTML = `<div class="panel compact"><span class="section-label">循环已冻结</span><h1>过去，也在等你。</h1><p>${w.pauses.has("performance") ? "检测到长帧间隔，已暂停以避免跳过行动。" : "恢复后将从同一个瞬间继续。"}</p><button id="resume" class="primary" ${w.pauses.has("hidden") ? "disabled" : ""}>继续追猎 ${arrow}</button><button id="menu" class="secondary">返回主菜单</button>${this.settingsMarkup()}</div>`;
       this.el("resume").onclick = () => this.resume();
       this.el("menu").onclick = () => this.menu();
