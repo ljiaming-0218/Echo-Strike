@@ -128,3 +128,14 @@
 限制：真实微信/QQ内核、Android/iOS硬件触控与移动GPU仍未直接验证。页面横向适配不等于平台支持了系统方向锁定；原生全屏可能被内置浏览器拒绝。公开HTTPS云浏览器证书限制仍按之前安全流程处理，不修改信任库/不关闭校验。
 
 生产包复查：preview在1440×900、844×390、390×844（应用内旋转）三个模式下，HTML/JS/CSS/两份WebP均无错误，画布完整处于可见范围。菜单clientHeight/scrollHeight分别900/900和390/390；正式构建无旧/新测试接口。原素材与最终生产截图在同次view_image检查中对照了材质、配色、角色、掩体/晶体轮廓、HUD文字与旋转触控排布。
+
+## 2.1 发布结果
+
+- 源码提交31c7adb39ddb52367dfa2cd01676faca66c8765d已推送main。GitHub CI完整成功：https://github.com/ljiaming-0218/Echo-Strike/actions/runs/40294121168 ，全量37项核心与10个浏览器流程通过。
+- 公开地址 https://echo-rush.onrender.com ，2026-10-26 16:43:17（Asia/Shanghai）校验HTML、JS、CSS与两张WebP均200、MIME正确，与本地生产包逐字节一致。图像合计383098字节，约374.1KiB。
+  - `/assets/index-BaaH3EZ9.js` SHA-256 `236d500baf67268d8f3deacd7841117a19afefb56094703cbe88e3b18f48a38f`
+  - `/assets/phaser-DFK5Ua9d.js` SHA-256 `f9025c1a29bc3ae097dd886ce07717b297466da1ce8f032c8294252ce6cf5cdb`
+  - `/assets/index-D4h7cE2F.css` SHA-256 `e1d0b0324c14ef34b8e1119554509b0f10b777a5147fe72148bead5c26305dca`
+  - `/assets/chrono-lab.webp` SHA-256 `a560243868349fa3ef413ff03674d0e41ee5b4467e1b951f9a6d88712fbfe030`
+  - `/assets/chrono-agent.webp` SHA-256 `4077463e44582a643a47789a2319955bfa677b0adf9f928c3641aaace5a925d8`
+- Browser插件不可用，生产画面和交互使用本地Playwright Chromium检查；公开端采用正常TLS的内容/资源验证，保持原有证书限制说明。真实微信/QQ尚未宣称通过，待用户在其手机中点“横向适配并开始”体验。
